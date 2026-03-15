@@ -1,0 +1,108 @@
+"""
+故事状态模型
+维护游戏的剧情状态，包括背景、人物、线索、结局种子等
+"""
+
+from typing import Optional, List
+from datetime import datetime
+from pydantic import BaseModel, Field
+
+
+class Character(BaseModel):
+    """角色模型"""
+    name: str = Field(..., description="角色名称")
+    description: str = Field(..., description="角色描述")
+    avatar: Optional[str] = Field(None, description="角色头像URL")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "name": "林默",
+                "description": "一位经验丰富、思维敏捷的侦探",
+                "avatar": None
+            }
+        }
+
+
+class Clue(BaseModel):
+    """线索模型"""
+    id: str = Field(..., description="线索ID")
+    content: str = Field(..., description="线索内容")
+    discovered_at: int = Field(..., description="发现时的轮次")
+    is_key: bool = Field(default=False, description="是否为关键线索")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": "clue_1",
+                "content": "现场发现了一枚独特的戒指",
+                "discovered_at": 5,
+                "is_key": True
+            }
+        }
+
+
+class EndingSeed(BaseModel):
+    """结局种子模型"""
+    id: str = Field(..., description="种子ID")
+    description: str = Field(..., description="结局描述")
+    probability: float = Field(default=0.33, description="初始概率")
+    confidence: float = Field(default=0.0, description="当前置信度")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": "ending_1",
+                "description": "凶手是管家，为了保护遗产而杀人",
+                "probability": 0.33,
+                "confidence": 0.0
+            }
+        }
+
+
+class UserIdentity(BaseModel):
+    """用户身份模型"""
+    role: str = Field(default="侦探助理", description="用户在故事中的角色")
+    description: str = Field(default="", description="用户身份的详细描述")
+
+
+class StoryState(BaseModel):
+    """故事状态模型"""
+    background: str = Field(default="", description="故事背景")
+    characters: List[Character] = Field(default_factory=list, description="角色列表")
+    user_identity: UserIdentity = Field(default_factory=UserIdentity, description="用户身份")
+    clues: List[Clue] = Field(default_factory=list, description="已发现线索")
+    ending_seeds: List[EndingSeed] = Field(default_factory=list, description="可能的结局种子")
+    current_chapter: str = Field(default="开始", description="当前章节")
+    context_summary: str = Field(default="", description="上下文摘要")
+    opening_scene: str = Field(default="", description="开场场景")
+    suggestions: List[str] = Field(default_factory=list, description="行动建议")
+
+    def add_clue(self, clue: Clue) -> None:
+        """添加线索"""
+        self.clues.append(clue)
+
+    def update_ending_confidence(self, seed_id: str, confidence: float) -> None:
+        """更新结局种子置信度"""
+        for seed in self.ending_seeds:
+            if seed.id == seed_id:
+                seed.confidence = confidence
+                break
+
+    def get_selected_ending(self) -> Optional[EndingSeed]:
+        """获取置信度最高的结局种子"""
+        if not self.ending_seeds:
+            return None
+        return max(self.ending_seeds, key=lambda x: x.confidence)
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "background": "",
+                "characters": [],
+                "clues": [],
+                "ending_seeds": [],
+                "current_chapter": "开始",
+                "context_summary": ""
+            }
+        }
