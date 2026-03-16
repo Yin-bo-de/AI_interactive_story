@@ -6,13 +6,15 @@
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Any
+import logging
 
 from ..services import get_session_service, get_story_service, get_timer_service
 from ..models.session import SessionStatus
 
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
+logger = logging.getLogger(__name__)
 
 
 # 请求/响应模型
@@ -265,3 +267,99 @@ async def delete_session(session_id: str):
         )
 
     return None
+
+
+class EndGameResponse(BaseModel):
+    """结束游戏响应"""
+    ending_title: str = Field(..., description="结局标题")
+    ending_story: str = Field(..., description="结局故事")
+    truth_revealed: str = Field(..., description="揭晓的真相")
+    clues_explanation: str = Field(..., description="线索解释")
+    player_evaluation: str = Field(..., description="玩家评价")
+    rating: float = Field(..., description="评分")
+
+
+@router.post("/{session_id}/end-game", response_model=EndGameResponse, status_code=status.HTTP_200_OK)
+async def end_game(session_id: str):
+    """
+    结束游戏并生成结局
+
+    当时间到或玩家主动结束游戏时调用，生成完整的结局内容
+    """
+    session_service = get_session_service()
+    story_service = get_story_service()
+    timer_service = get_timer_service()
+
+    session = session_service.get_session(session_id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="会话不存在"
+        )
+
+    # 停止计时器
+    timer_service.stop_timer(session_id)
+
+    # 检查游戏是否结束
+    session.check_game_over()
+    session_service.update_session(session)
+
+    try:
+        # 选择选择最合适的结局
+        selected_ending = session.story_state.get_selected_ending()
+
+        # 生成结局内容
+        from ..prompts import get_end_prompt
+
+        # 准备角色信息
+        characters_info = "\n".join([
+            f"- {char.name}: {char.description}"
+            for char in session.story_state.characters
+        ])
+
+        # 准备线索信息
+        key_clues = "\n".join([
+            f"- {clue.content}"
+            for clue in session.story_state.clues if clue.is_key
+        ])
+
+        # 准备玩家行动摘要
+        player_actions = session.story_state.context_summary
+        if not player_actions:
+            player_actions = "玩家进行了多轮对话和探索"
+
+        prompt = get_end_prompt(
+            background=session.story_state.background,
+            characters_info=characters_info,
+            selected_ending=selected_ending.description if selected_ending else "开放式结局",
+            player_actions=player_actions,
+            key_clues=key_clues,
+            total_rounds=session.dialogue_history.total_rounds,
+            duration_minutes=session.elapsed_time / 60
+        )
+
+        llm_service = story_service.llm_service
+        ending_result = await llm_service.call_llm_json(prompt)
+
+        # 确保会话已结束
+        session.status = SessionStatus.ENDED
+        session.end_time = datetime.now()
+        session_service.update_session(session)
+
+        logger.info(f"会话 {session_id} 已结束，生成结局: {ending_result.get('ending_title')}")
+
+        return EndGameResponse(
+            ending_title=ending_result.get("ending_title", "故事暂告段落"),
+            ending_story=ending_result.get("ending_story", ""),
+            truth_revealed=ending_result.get("truth_revealed", ""),
+            clues_explanation=ending_result.get("clues_explanation", ""),
+            player_evaluation=ending_result.get("player_evaluation", ""),
+            rating=ending_result.get("rating", 7.0)
+        )
+
+    except Exception as e:
+        logger.error(f"生成结局失败: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"生成结局失败: {str(e)}"
+        )

@@ -5,7 +5,7 @@ import { useGame } from '../contexts/GameContext';
  * 结局展示页面
  */
 const Result = () => {
-  const { ending, background, restartGame, storyType } = useGame();
+  const { ending, background, restartGame, storyType, isLoadingEnding } = useGame();
 
   const getStoryTypeName = (type) => {
     const types = {
@@ -19,84 +19,94 @@ const Result = () => {
   return (
     <div className="result">
       <div className="result-container">
-        {/* 标题 */}
-        <div className="result-header">
-          <div className="ending-badge">🎭</div>
-          <h1 className="ending-title">
-            {ending?.ending_title || '故事终章'}
-          </h1>
-        </div>
-
-        {/* 故事类型 */}
-        <div className="story-type-badge">
-          {getStoryTypeName(storyType)}
-        </div>
-
-        {/* 结局内容 */}
-        <div className="ending-content">
-          <div className="ending-section">
-            <h3 className="section-title">📖 故事结局</h3>
-            <p className="section-content">
-              {ending?.ending_story || '感谢你的参与，故事到此结束。'}
-            </p>
+        {/* 加载中状态 */}
+        {isLoadingEnding ? (
+          <div className="loading-container">
+            <div className="spinner"></div>
+            <p className="loading-text">正在生成结局...</p>
           </div>
+        ) : (
+          <>
+            {/* 标题 */}
+            <div className="result-header">
+              <div className="ending-badge">🎭</div>
+              <h1 className="ending-title">
+                {ending?.ending_title || '故事终章'}
+              </h1>
+            </div>
 
-          {ending?.truth_revealed && (
-            <div className="ending-section">
-              <h3 className="section-title">💡 真相</h3>
-              <p className="section-content">
-                {ending.truth_revealed}
-              </p>
+            {/* 故事类型 */}
+            <div className="story-type-badge">
+              {getStoryTypeName(storyType)}
             </div>
-          )}
 
-          {ending?.clues_explanation && (
-            <div className="ending-section">
-              <h3 className="section-title">🔍 线索解析</h3>
-              <p className="section-content">
-                {ending.clues_explanation}
-              </p>
-            </div>
-          )}
+            {/* 结局内容 */}
+            <div className="ending-content">
+              <div className="ending-section">
+                <h3 className="section-title">📖 故事结局</h3>
+                <p className="section-content">
+                  {ending?.ending_story || '感谢你的参与，故事到此结束。'}
+                </p>
+              </div>
 
-          {ending?.player_evaluation && (
-            <div className="ending-section">
-              <h3 className="section-title">👤 你的表现</h3>
-              <p className="section-content">
-                {ending.player_evaluation}
-              </p>
-            </div>
-          )}
-        </div>
+              {ending?.truth_revealed && (
+                <div className="ending-section">
+                  <h3 className="section-title">💡 真相</h3>
+                  <p className="section-content">
+                    {ending.truth_revealed}
+                  </p>
+                </div>
+              )}
 
-        {/* 评分 */}
-        {ending?.rating !== undefined && (
-          <div className="rating">
-            <div className="rating-stars">
-              {[...Array(10)].map((_, index) => (
-                <span
-                  key={index}
-                  className={`star ${index < Math.round(ending.rating) ? 'filled' : ''}`}
-                >
-                  ★
-                </span>
-              ))}
+              {ending?.clues_explanation && (
+                <div className="ending-section">
+                  <h3 className="section-title">🔍 线索解析</h3>
+                  <p className="section-content">
+                    {ending.clues_explanation}
+                  </p>
+                </div>
+              )}
+
+              {ending?.player_evaluation && (
+                <div className="ending-section">
+                  <h3 className="section-title">👤 你的表现</h3>
+                  <p className="section-content">
+                    {ending.player_evaluation}
+                  </p>
+                </div>
+              )}
             </div>
-            <div className="rating-value">
-              {ending.rating.toFixed(1)}/10
+
+            {/* 评分 */}
+            {ending?.rating !== undefined && (
+              <div className="rating">
+                <div className="rating-stars">
+                  {[...Array(10)].map((_, index) => (
+                    <span
+                      key={index}
+                      className={`star ${index < Math.round(ending.rating) ? 'filled' : ''}`}
+                    >
+                      ★
+                    </span>
+                  ))}
+                </div>
+                <div className="rating-value">
+                  {ending.rating.toFixed(1)}/10
+                </div>
+              </div>
+            )}
+
+            {/* 操作按钮 */}
+            <div className="action-buttons">
+              <button
+                className="action-button primary"
+                onClick={restartGame}
+              >
+                🔄 重新开始
+              </button>
             </div>
-          </div>
+          </>
         )}
-
-        {/* 操作按钮 */}
-        <div className="action-buttons">
-          <button
-            className="action-button primary"
-            onClick={restartGame}
-          >
-            🔄 重新开始
-          </button>
-        </div>
       </div>
 
       <style jsx>{`
@@ -117,6 +127,34 @@ const Result = () => {
           border-radius: 20px;
           padding: 40px;
           animation: fadeIn 0.5s ease;
+        }
+
+        /* 加载状态 */
+        .loading-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 60px 20px;
+        }
+
+        .loading-container .spinner {
+          width: 48px;
+          height: 48px;
+          border: 3px solid #3f3f46;
+          border-top-color: #2196F3;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+          margin-bottom: 20px;
+        }
+
+        .loading-text {
+          color: #a1a1aa;
+          font-size: 16px;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
         }
 
         @keyframes fadeIn {

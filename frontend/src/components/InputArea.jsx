@@ -98,6 +98,7 @@ const InputArea = () => {
           background: #1a1a2e;
           border-top: 1px solid #16213e;
           padding: 16px 20px;
+          z-index: 20;
         }
 
         .pause-banner,

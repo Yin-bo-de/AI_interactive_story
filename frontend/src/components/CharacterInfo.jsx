@@ -39,8 +39,8 @@ const CharacterInfo = () => {
       <style jsx>{`
         .character-info {
           position: fixed;
-          top: 72px;
-          right: 20px;
+          top: 100px;
+          left: 20px;
           background: #1a1a2e;
           border: 1px solid #16213e;
           border-radius: 12px;

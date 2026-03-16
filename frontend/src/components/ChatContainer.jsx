@@ -54,6 +54,7 @@ const ChatContainer = () => {
           overflow-y: auto;
           padding: 20px;
           padding-top: 100px;
+          padding-bottom: 100px;
           background: #0f0f1a;
         }
 

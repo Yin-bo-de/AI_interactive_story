@@ -34,23 +34,25 @@ const OptionsPanel = ({ options, onOptionClick }) => {
 
       <style jsx>{`
         .options-panel {
-          background: #1a1a2e;
-          border-top: 1px solid #16213e;
-          border-bottom: 1px solid #16213e;
-          padding: 16px 20px;
-          margin: 8px 20px;
+          position: fixed;
+          right: calc(50% - 900px);
+          top: 50%;
+          transform: translateY(-50%);
+          width: 260px;
+          background: rgba(26, 26, 46, 0.95);
+          border: 1px solid #2196F3;
           border-radius: 12px;
-          max-width: 800px;
-          margin-left: auto;
-          margin-right: auto;
-          width: 100%;
+          padding: 16px;
+          z-index: 10;
+          backdrop-filter: blur(10px);
+          box-shadow: 0 4px 20px rgba(33, 150, 243, 0.2);
         }
 
         .options-header {
           display: flex;
           align-items: center;
           gap: 8px;
-          margin-bottom: 12px;
+          margin-bottom: 16px;
         }
 
         .options-icon {
@@ -64,9 +66,9 @@ const OptionsPanel = ({ options, onOptionClick }) => {
         }
 
         .options-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 10px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
         }
 
         .option-card {
@@ -76,7 +78,8 @@ const OptionsPanel = ({ options, onOptionClick }) => {
           background: #0f0f1a;
           border: 1px solid #16213e;
           border-radius: 8px;
-          padding: 12px 16px;
+          padding: 16px 16px;
+          min-height: 60px;
           text-align: left;
           cursor: pointer;
           transition: all 0.2s;

@@ -10,23 +10,25 @@ import Result from './pages/Result';
 
 // AppContent 组件 - 路由逻辑
 const AppContent = () => {
-  const { gameStatus, isEnded } = useGame();
+  const { gameStatus, isEnded, isLoadingEnding } = useGame();
   const navigate = useNavigate();
 
   // 监听游戏状态变化，自动跳转路由
   useEffect(() => {
-    if (isEnded) {
+    if (isEnded && !isLoadingEnding) {
+      // 只有在结局加载完成后才跳转到结果页
       navigate('/result', { replace: true });
     } else if (gameStatus === 'active') {
       navigate('/game', { replace: true });
     } else if (gameStatus === 'waiting') {
       navigate('/intro', { replace: true });
     } else if (gameStatus === 'initializing' || gameStatus === 'error') {
-      // 保持在当前页面
+      // 回到首页
+      navigate('/', { replace: true });
     } else {
       navigate('/', { replace: true });
     }
-  }, [gameStatus, isEnded, navigate]);
+  }, [gameStatus, isEnded, isLoadingEnding, navigate]);
 
   return (
     <Routes>

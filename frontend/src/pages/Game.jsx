@@ -63,8 +63,8 @@ const Game = () => {
           display: flex;
           flex-direction: column;
           overflow: hidden;
-          padding-bottom: 120px; /* 为输入框留出空间 */
           padding-top: 80px; /* 为游戏状态条留出空间 */
+          padding-bottom: 140px; /* 为输入框留出空间 */
         }
       `}</style>
     </div>

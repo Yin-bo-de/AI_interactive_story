@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { createSession, getSessionStatus, enterScene as enterSceneAPI } from '../api/session';
+import { createSession, getSessionStatus, enterScene as enterSceneAPI, end as endGameAPI } from '../api/session';
 import { sendMessage as sendMessageAPI } from '../api/message';
 
 const GameContext = createContext(null);
@@ -30,6 +30,7 @@ export const GameProvider = ({ children }) => {
   // 结局状态
   const [isEnded, setIsEnded] = useState(false);
   const [ending, setEnding] = useState(null);
+  const [isLoadingEnding, setIsLoadingEnding] = useState(false);
 
   // 当前角色
   const [character, setCharacter] = useState(null);
@@ -174,9 +175,10 @@ export const GameProvider = ({ children }) => {
    * 处理游戏结束
    */
   const handleGameEnd = (endingData) => {
+    console.log('[GameContext] handleGameEnd被调用，endingData:', endingData);
+    setEnding(endingData);
     setIsEnded(true);
     setGameStatus('ended');
-    setEnding(endingData);
     stopStatusPolling();
   };
 
@@ -204,14 +206,26 @@ export const GameProvider = ({ children }) => {
         setCurrentRound(status.total_rounds);
 
         // 检查是否时间到了
-        if (status.remaining_time <= 0) {
-          handleGameEnd(null);
+        if (status.remaining_time <= 0 && !isLoadingEnding && !isEnded) {
+          console.log('[GameContext] 时间耗尽，获取游戏结局...');
+          setIsLoadingEnding(true);
+          try {
+            const endingData = await endGameAPI(sessionId);
+            console.log('[GameContext] 获取到结局:', endingData);
+            handleGameEnd(endingData);
+          } catch (err) {
+            console.error('[GameContext] 获取结局失败:', err);
+            // 即使获取结局失败，也结束游戏
+            handleGameEnd(null);
+          } finally {
+            setIsLoadingEnding(false);
+          }
         }
 
       } catch (err) {
         console.error('轮询状态失败:', err);
       }
-    }, 5000); // 每5秒轮询一次
+    },1000); // 每1秒轮询一次
   };
 
   /**
@@ -228,7 +242,7 @@ export const GameProvider = ({ children }) => {
    * 重新开始游戏
    */
   const restartGame = async () => {
-    // 清理状态
+    // 清理所有游戏状态
     setSessionId(null);
     setMessages([]);
     setEnding(null);
@@ -239,9 +253,8 @@ export const GameProvider = ({ children }) => {
     setBackground('');
     setCharacters([]);
     setUserIdentity(null);
-
-    // 重新初始化
-    setGameStatus('initializing');
+    setGameStatus('initializing');  // 设置状态让App组件导航回首页
+    console.log('[GameContext] 游戏已重置，状态为 initializing');
   };
 
   // 清理定时器
@@ -278,6 +291,7 @@ export const GameProvider = ({ children }) => {
     // 结局
     isEnded,
     ending,
+    isLoadingEnding,
 
     // 错误
     error,

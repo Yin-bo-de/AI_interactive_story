@@ -22,6 +22,7 @@ const Intro = () => {
   const [currentSection, setCurrentSection] = useState(0);
   const [showEnterButton, setShowEnterButton] = useState(false);
   const [isEntering, setIsEntering] = useState(false);
+  const [showBackgroundContinue, setShowBackgroundContinue] = useState(false);
 
   // 检查是否有必要的数据
   useEffect(() => {
@@ -35,8 +36,14 @@ const Intro = () => {
   // 处理背景故事展示完成
   const handleBackgroundComplete = () => {
     setTimeout(() => {
-      setCurrentSection(1);
+      setShowBackgroundContinue(true);
     }, 500);
+  };
+
+  // 处理从背景继续到人物介绍
+  const handleBackgroundContinue = () => {
+    setShowBackgroundContinue(false);
+    setCurrentSection(1);
   };
 
   // 处理人物介绍展示完成
@@ -80,6 +87,14 @@ const Intro = () => {
                 onComplete={handleBackgroundComplete}
               />
             </div>
+            {showBackgroundContinue && (
+              <button
+                className="continue-button"
+                onClick={handleBackgroundContinue}
+              >
+                继续 →
+              </button>
+            )}
           </div>
         );
       case 1:
@@ -291,6 +306,11 @@ const Intro = () => {
           font-size: 16px;
           line-height: 1.8;
           position: relative;
+          margin-bottom: 24px;
+        }
+
+        .background-section .continue-button {
+          margin-top: 8px;
         }
 
         /* 人物介绍区域 */

@@ -67,3 +67,16 @@ export const enterScene = async (sessionId) => {
     throw error;
   }
 };
+
+/**
+ * 结束游戏并获取结局
+ */
+export const end = async (sessionId) => {
+  try {
+    const response = await apiClient.post(`/sessions/${sessionId}/end-game`);
+    return response.data;
+  } catch (error) {
+    console.error('结束游戏失败:', error);
+    throw error;
+  }
+};
