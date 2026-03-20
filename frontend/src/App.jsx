@@ -16,7 +16,7 @@ const AppContent = () => {
   // 监听游戏状态变化，自动跳转路由
   useEffect(() => {
     if (isEnded && !isLoadingEnding) {
-      // 只有在结局加载完成后才跳转到结果页
+      // 游结局加载完成后跳转到结果页
       navigate('/result', { replace: true });
     } else if (gameStatus === 'active') {
       navigate('/game', { replace: true });

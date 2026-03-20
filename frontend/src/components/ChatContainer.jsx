@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useGame } from '../contexts/GameContext';
+import Typewriter from './Typewriter';
 
 /**
  * 聊天容器组件
@@ -8,10 +9,15 @@ import { useGame } from '../contexts/GameContext';
 const ChatContainer = () => {
   const { messages, scrollToBottom } = useGame();
   const chatEndRef = useRef(null);
+  const messagesListRef = useRef(null);
 
-  // 自动滚动到底部
+  // 自动滚动逻辑
   useEffect(() => {
-    if (scrollToBottom && chatEndRef.current) {
+    if (messages.length === 1) {
+      // 首次加载第一条消息，滚动到顶部
+      messagesListRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (scrollToBottom && chatEndRef.current) {
+      // 后续新消息，滚动到底部
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, scrollToBottom]);
@@ -24,7 +30,7 @@ const ChatContainer = () => {
           <div className="empty-text">还没有对话，开始你的推理之旅吧！</div>
         </div>
       ) : (
-        <div className="messages-list">
+        <div className="messages-list" ref={messagesListRef}>
           {messages.map((message, index) => (
             <div
               key={index}
@@ -34,7 +40,17 @@ const ChatContainer = () => {
                 {message.role === 'user' ? '👤' : '🔍'}
               </div>
               <div className="message-content">
-                <div className="message-text">{message.content}</div>
+                <div className="message-text">
+                  {message.role === 'assistant' ? (
+                    <Typewriter
+                      text={message.content}
+                      speed={100}
+                      showCursor={false}
+                    />
+                  ) : (
+                    message.content
+                  )}
+                </div>
                 <div className="message-time">
                   {new Date(message.timestamp).toLocaleTimeString('zh-CN', {
                     hour: '2-digit',
@@ -52,8 +68,10 @@ const ChatContainer = () => {
         .chat-container {
           flex: 1;
           overflow-y: auto;
-          padding: 20px;
-          padding-top: 100px;
+          margin-left: 340px;
+          margin-right: 340px;
+          padding: 20px 40px;
+          padding-top: 80px;
           padding-bottom: 100px;
           background: #0f0f1a;
         }
@@ -65,6 +83,7 @@ const ChatContainer = () => {
           justify-content: center;
           height: 100%;
           color: #a1a1aa;
+          min-height: calc(100vh - 180px);
         }
 
         .empty-icon {
@@ -81,7 +100,7 @@ const ChatContainer = () => {
           display: flex;
           flex-direction: column;
           gap: 16px;
-          max-width: 800px;
+          max-width: 100%;
           margin: 0 auto;
         }
 
@@ -123,7 +142,7 @@ const ChatContainer = () => {
         }
 
         .message-content {
-          max-width: 70%;
+          max-width: 600px;
         }
 
         .message-text {

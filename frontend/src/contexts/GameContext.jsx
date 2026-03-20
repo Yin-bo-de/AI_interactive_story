@@ -38,18 +38,22 @@ export const GameProvider = ({ children }) => {
   // 错误状态
   const [error, setError] = useState(null);
 
+  // 背景音乐控制
+  const [musicEnabled, setMusicEnabled] = useState(true);
+  const [musicVolume, setMusicVolume] = useState(0.3);
+
   /**
    * 初始化游戏（第一阶段：创建会话，获取背景和人物）
    */
-  const initializeGame = async (type = 'mystery') => {
+  const initializeGame = async (type = 'mystery', config = {}) => {
     try {
       console.log('[GameContext] 开始初始化游戏，类型:', type);
       setError(null);
       setGameStatus('initializing');
 
-      // 创建会话
+      // 创建会话，合并配置
       console.log('[GameContext] 调用 createSession API...');
-      const session = await createSession({ story_type: type });
+      const session = await createSession({ story_type: type, ...config });
       console.log('[GameContext] 收到后端响应:', session);
 
       setSessionId(session.session_id);
@@ -102,7 +106,7 @@ export const GameProvider = ({ children }) => {
 
       console.log('[GameContext] 设置游戏状态为 active');
       setGameStatus('active');
-      setScrollToBottom(true);
+      setScrollToBottom(false); // 进入现场时不滚动到底部，让用户从开头看起
 
       // 开始轮询游戏状态
       startStatusPolling();
@@ -117,7 +121,7 @@ export const GameProvider = ({ children }) => {
   };
 
   /**
-   * 发送用户消息
+   * 发送用户消息（非流式）
    */
   const sendMessage = async (content) => {
     if (!sessionId || isSending || isEnded) return;
@@ -135,7 +139,7 @@ export const GameProvider = ({ children }) => {
       setMessages(prev => [...prev, userMessage]);
       setScrollToBottom(true);
 
-      // 发送消息到后端
+      // 非流式调用
       const response = await sendMessageAPI(sessionId, content);
 
       // 添加AI回复到历史
@@ -148,7 +152,7 @@ export const GameProvider = ({ children }) => {
       setMessages(prev => [...prev, aiMessage]);
 
       // 更新选项
-      setCurrentOptions(response.options || [])
+      setCurrentOptions(response.options || []);
 
       // 更新轮次
       setCurrentRound(response.round_number);
@@ -295,6 +299,12 @@ export const GameProvider = ({ children }) => {
 
     // 错误
     error,
+
+    // 背景音乐
+    musicEnabled,
+    musicVolume,
+    setMusicEnabled,
+    setMusicVolume,
 
     // 方法
     initializeGame,

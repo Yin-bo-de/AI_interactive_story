@@ -1,76 +1,62 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useGame } from '../contexts/GameContext';
 
 /**
  * 角色信息组件
  * 显示所有人物信息
+ * 固定在左侧，铺满聊天框左侧
  */
 const CharacterInfo = () => {
   const { characters } = useGame();
-  const [isExpanded, setIsExpanded] = useState(true);
 
   if (!characters || characters.length === 0) {
     return null;
   }
 
   return (
-    <div className={`character-info ${isExpanded ? 'expanded' : ''}`}>
-      <div
-        className="character-header"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
+    <div className="character-info">
+      <div className="character-header">
         <div className="header-icon">👥</div>
         <div className="header-title">剧中人物</div>
-        <div className="expand-icon">
-          {isExpanded ? '▼' : '▶'}
-        </div>
       </div>
 
-      {isExpanded && (
-        <div className="characters-list">
-          {characters.map((char, index) => (
-            <div key={index} className="character-item">
-              <div className="character-avatar">
-                {char.avatar || '👤'}
-              </div>
-              <div className="character-info-item">
-                <div className="character-name">{char.name}</div>
-                <div className="character-description">
-                  {char.description}
-                </div>
+      <div className="characters-list">
+        {characters.map((char, index) => (
+          <div key={index} className="character-item">
+            <div className="character-avatar">
+              {char.avatar || '👤'}
+            </div>
+            <div className="character-info-item">
+              <div className="character-name">{char.name}</div>
+              <div className="character-description">
+                {char.description}
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
 
       <style jsx>{`
         .character-info {
           position: fixed;
-          top: 100px;
-          left: 20px;
-          background: #1a1a2e;
-          border: 1px solid #16213e;
-          border-radius: 12px;
-          overflow: hidden;
-          z-index: 99;
-          transition: all 0.3s ease;
-          max-height: ${isExpanded ? '500px' : '52px'};
-          width: 540px;
+          top: 80px;
+          left: 0;
+          width: 340px;
+          height: calc(100vh - 140px);
+          background: rgba(26, 26, 46, 0.95);
+          border-right: 1px solid #16213e;
+          z-index: 10;
+          display: flex;
+          flex-direction: column;
         }
 
         .character-header {
           display: flex;
           align-items: center;
           gap: 10px;
-          padding: 12px 16px;
-          cursor: pointer;
-          background: #1a1a2e;
-          width: 240px;
-        }
-
-        .character-header:hover {
-          background: #16213e;
+          padding: 16px 24px;
+          background: rgba(22, 33, 62, 0.95);
+          border-bottom: 1px solid #16213e;
         }
 
         .header-icon {
@@ -78,44 +64,39 @@ const CharacterInfo = () => {
         }
 
         .header-title {
-          flex: 1;
           color: #e4e4e7;
           font-size: 14px;
           font-weight: 600;
         }
 
-        .expand-icon {
-          color: #a1a1aa;
-          font-size: 12px;
-          transition: transform 0.3s ease;
-        }
-
         .characters-list {
-          padding: 8px 12px 12px;
+          flex: 1;
+          padding: 24px;
+          padding-bottom: 32px;
           display: flex;
           flex-direction: column;
-          gap: 12px;
-          max-height: 430px;
+          gap: 20px;
           overflow-y: auto;
         }
 
         .character-item {
           display: flex;
-          gap: 10px;
-          background: rgba(0, 0, 0, 0.2);
+          gap: 16px;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 8px;
-          padding: 10px;
+          padding: 16px;
         }
 
         .character-avatar {
-          width: 40px;
-          height: 40px;
+          width: 48px;
+          height: 48px;
           border-radius: 50%;
           background: #0f0f1a;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 20px;
+          font-size: 24px;
           flex-shrink: 0;
         }
 
@@ -126,15 +107,15 @@ const CharacterInfo = () => {
 
         .character-name {
           color: #e4e4e7;
-          font-size: 14px;
+          font-size: 15px;
           font-weight: 600;
-          margin-bottom: 4px;
+          margin-bottom: 6px;
         }
 
         .character-description {
           color: #a1a1aa;
-          font-size: 12px;
-          line-height: 1.4;
+          font-size: 13px;
+          line-height: 1.5;
         }
 
         /* 滚动条样式 */
@@ -144,7 +125,6 @@ const CharacterInfo = () => {
 
         .characters-list::-webkit-scrollbar-track {
           background: rgba(0, 0, 0, 0.2);
-          border-radius: 2px;
         }
 
         .characters-list::-webkit-scrollbar-thumb {

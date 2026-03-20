@@ -7,14 +7,13 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from typing import Optional, Any
-import logging
-
+from loguru import logger
+import os
 from ..services import get_session_service, get_story_service, get_timer_service
 from ..models.session import SessionStatus
 
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
-logger = logging.getLogger(__name__)
 
 # 存储自定义故事服务实例 {session_id: story_service}
 _custom_story_services = {}
@@ -23,7 +22,7 @@ _custom_story_services = {}
 # 格式: "XXXX-XXXX-XXXX-XXXX": {"api_key": "xxx", "api_base": "xxx", "model_name": "xxx", "remaining_games": 10}
 _redemption_codes = {
   "7FUF-0UZG-1NQT-69KL": {
-    "api_key": "sk-7d4bff0417a84819882e477cdfe90565",
+    "api_key": os.getenv("ALIYUN_API_KEY"),
     "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
     "model_name": "qwen3.5-plus",
     "remaining_games": 10

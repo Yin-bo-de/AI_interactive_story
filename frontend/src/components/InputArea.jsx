@@ -60,7 +60,7 @@ const InputArea = () => {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyPress={handleKeyPress}
-          placeholder={isEnded ? '游戏已结束' : '输入你的消息...（按 Enter 发送，Shift+Enter 换行）'}
+          placeholder={isEnded ? '游戏已结束' : isSending ? '处理中...' : '输入你的消息...（按 Enter 发送，Shift+Enter 换行）'}
           disabled={isSending || isEnded}
           maxLength={maxLength}
           rows={1}
@@ -78,7 +78,7 @@ const InputArea = () => {
             {isSending ? (
               <>
                 <span className="spinner"></span>
-                发送中...
+                处理中...
               </>
             ) : (
               <>

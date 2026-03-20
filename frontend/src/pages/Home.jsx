@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useGame } from '../contexts/GameContext';
+import { apiClient } from '../api/client';
 
 /**
  * 首页组件
@@ -9,6 +10,36 @@ const Home = () => {
   const { initializeGame, gameStatus, error } = useGame();
   const [selectedType, setSelectedType] = useState('mystery');
   const [isInitializing, setIsInitializing] = useState(false);
+
+  // API配置状态
+  const [apiKey, setApiKey] = useState('');
+  const [apiBase, setApiBase] = useState('');
+  const [modelName, setModelName] = useState('gpt-4o');
+  const [isVerifyingAPI, setIsVerifyingAPI] = useState(false);
+  const [apiVerified, setApiVerified] = useState(false);
+  const [apiErrorMessage, setApiErrorMessage] = useState('');
+
+  // 兑换码状态
+  const [redemptionCode, setRedemptionCode] = useState('');
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+  const [codeVerified, setCodeVerified] = useState(false);
+  const [codeInfo, setCodeInfo] = useState(null);
+  const [codeErrorMessage, setCodeErrorMessage] = useState('');
+
+  // 检查本地存储中的验证状态
+  useState(() => {
+    const savedVerified = localStorage.getItem('api_verified') === 'true';
+    const savedApiKey = localStorage.getItem('api_key') || '';
+    const savedApiBase = localStorage.getItem('api_base') || '';
+    const savedModelName = localStorage.getItem('model_name') || 'gpt-4o';
+
+    if (savedVerified) {
+      setApiVerified(true);
+      setApiKey(savedApiKey);
+      setApiBase(savedApiBase);
+      setModelName(savedModelName);
+    }
+  });
 
   const storyTypes = [
     {
@@ -34,16 +65,98 @@ const Home = () => {
     }
   ];
 
+  // 验证API配置
+  const handleVerifyAPI = async () => {
+    if (!apiKey || !apiBase) {
+      setApiErrorMessage('请填写API Key和Base URL');
+      return;
+    }
+
+    setIsVerifyingAPI(true);
+    setApiErrorMessage('');
+
+    try {
+      const response = await apiClient.post('/sessions/verify-api', {
+        api_key: apiKey,
+        api_base: apiBase,
+        model_name: modelName
+      });
+
+      if (response.data.success) {
+        setApiVerified(true);
+        setApiErrorMessage('');
+        // 保存到本地存储
+        localStorage.setItem('api_verified', 'true');
+        localStorage.setItem('api_key', apiKey);
+        localStorage.setItem('api_base', apiBase);
+        localStorage.setItem('model_name', modelName);
+      } else {
+        setApiVerified(false);
+        setApiErrorMessage(response.data.message);
+      }
+    } catch (err) {
+      setApiVerified(false);
+      setApiErrorMessage(err.response?.data?.message || 'API API验证失败');
+    } finally {
+      setIsVerifyingAPI(false);
+    }
+  };
+
+  // 验证兑换码
+  const handleVerifyCode = async () => {
+    if (!redemptionCode) {
+      setCodeErrorMessage('请填写兑换码');
+      return;
+    }
+
+    setIsVerifyingCode(true);
+    setCodeErrorMessage('');
+
+    try {
+      const response = await apiClient.post('/sessions/verify-code', {
+        code: redemptionCode
+      });
+
+      if (response.data.success) {
+        setCodeVerified(true);
+        setCodeInfo(response.data);
+        setCodeErrorMessage('');
+      } else {
+        setCodeVerified(false);
+        setCodeInfo(null);
+        setCodeErrorMessage(response.data.message);
+      }
+    } catch (err) {
+      setCodeVerified(false);
+      setCodeInfo(null);
+      setCodeErrorMessage(err.response?.data?.message || '兑换码验证失败');
+    } finally {
+      setIsVerifyingCode(false);
+    }
+  };
+
   const handleStart = async () => {
     setIsInitializing(true);
     try {
-      await initializeGame(selectedType);
+      // 使用兑换码配置或API配置
+      const config = codeVerified && codeInfo ? {
+        redemption_code: redemptionCode
+      } : {
+        api_key: apiKey,
+        api_base: apiBase,
+        model_name: modelName
+      };
+
+      await initializeGame(selectedType, config);
     } catch (err) {
       console.error('开始游戏失败:', err);
     } finally {
       setIsInitializing(false);
     }
   };
+
+  // 判断是否可以开始游戏
+  const canStart = apiVerified || codeVerified;
 
   return (
     <div className="home">
@@ -85,9 +198,9 @@ const Home = () => {
 
         {/* 开始按钮 */}
         <button
-          className={`start-button ${isInitializing ? 'loading' : ''}`}
+          className={`start-button ${isInitializing ? 'loading' : ''} ${!canStart ? 'disabled' : ''}`}
           onClick={handleStart}
-          disabled={isInitializing}
+          disabled={isInitializing || !canStart}
         >
           {isInitializing ? (
             <>
@@ -101,6 +214,115 @@ const Home = () => {
             </>
           )}
         </button>
+
+        {/* API配置区域 */}
+        <div className="api-config">
+          <h3 className="config-title">API 配置（或使用兑换码）</h3>
+          <div className="config-inputs">
+            <div className="input-group">
+              <label className="input-label">API Key</label>
+              <input
+                type="password"
+                className="config-input"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="sk-xxx"
+                disabled={codeVerified}
+              />
+            </div>
+            <div className="input-group">
+              <label className="input-label">Base URL</label>
+              <input
+                type="text"
+                className="config-input"
+                value={apiBase}
+                onChange={(e) => setApiBase(e.target.value)}
+                placeholder="https://api.openai.com/v1/chat/completions"
+                disabled={codeVerified}
+              />
+            </div>
+            <div className="input-group">
+              <label className="input-label">模型名称</label>
+              <input
+                type="text"
+                className="config-input"
+                value={modelName}
+                onChange={(e) => setModelName(e.target.value)}
+                placeholder="gpt-4o"
+                disabled={codeVerified}
+              />
+            </div>
+            <button
+              className={`verify-btn ${isVerifyingAPI ? 'verifying' : ''}`}
+              onClick={handleVerifyAPI}
+              disabled={isVerifyingAPI || codeVerified || !apiKey || !apiBase}
+            >
+              {isVerifyingAPI ? (
+                <>
+                  <span className="spinner-small"></span>
+                  验证中...
+                </>
+              ) : apiVerified ? (
+                <>
+                  ✓ 已验证
+                </>
+              ) : (
+                <>
+                  验证 API
+                </>
+              )}
+            </button>
+          </div>
+          {apiErrorMessage && (
+            <div className="error-message api-error">
+              ⚠️ {apiErrorMessage}
+            </div>
+          )}
+        </div>
+
+        {/* 兑换码区域 */}
+        <div className="redemption-code">
+          <h3 className="config-title">或使用游戏兑换码</h3>
+          <div className="config-inputs">
+            <div className="input-group">
+              <label className="input-label">兑换码</label>
+              <input
+                type="text"
+                className="config-input"
+                value={redemptionCode}
+                onChange={(e) => setRedemptionCode(e.target.value)}
+                placeholder="XXXX-XXXX-XXXX-XXXX"
+                disabled={apiVerified}
+                maxLength={19}
+              />
+            </div>
+            <button
+              className={`verify-btn ${isVerifyingCode ? 'verifying' : ''}`}
+              onClick={handleVerifyCode}
+              disabled={isVerifyingCode || apiVerified || !redemptionCode}
+            >
+              {isVerifyingCode ? (
+                <>
+                  <span className="spinner-small"></span>
+                  验证中...
+                </>
+              ) : codeVerified ? (
+                <>
+                  ✓ 已验证（剩余 {codeInfo?.remaining_games || 0} 次）
+                </>
+              ) : (
+                <>
+                  兑换
+                </>
+              )}
+            </button>
+          </div>
+          {codeErrorMessage && (
+            <div className="error-message code-error">
+              ⚠️ {codeErrorMessage}
+            </div>
+          )}
+        </div>
 
         {/* 错误提示 */}
         {error && (
@@ -143,7 +365,7 @@ const Home = () => {
 
         .header {
           text-align: center;
-          margin-bottom: 60px;
+          margin-bottom: 40px;
         }
 
         .logo {
@@ -173,36 +395,36 @@ const Home = () => {
         }
 
         .story-types {
-          margin-bottom: 40px;
+          margin-bottom: 30px;
         }
 
         .section-title {
           color: #e4e4e7;
-          font-size: 24px;
+          font-size: 20px;
           font-weight: 600;
           text-align: center;
-          margin-bottom: 24px;
+          margin-bottom: 16px;
         }
 
         .type-grid {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-          gap: 16px;
+          gap: 12px;
         }
 
         .type-card {
           position: relative;
           background: #1a1a2e;
           border: 2px solid transparent;
-          border-radius: 16px;
-          padding: 32px 24px;
+          border-radius: 12px;
+          padding: 24px 16px;
           text-align: center;
           cursor: pointer;
           transition: all 0.3s;
         }
 
         .type-card:hover:not(.selected) {
-          transform: translateY(-4px);
+          transform: translateY(-2px);
           border-color: var(--type-color);
         }
 
@@ -212,36 +434,37 @@ const Home = () => {
         }
 
         .type-icon {
-          font-size: 40px;
-          margin-bottom: 12px;
+          font-size: 32px;
+          margin-bottom: 8px;
         }
 
         .type-name {
           color: #e4e4e7;
-          font-size: 18px;
+          font-size: 16px;
           font-weight: 600;
-          margin-bottom: 8px;
+          margin-bottom: 6px;
         }
 
         .type-description {
           color: #a1a1aa;
-          font-size: 14px;
-          line-height: 1.5;
+          font-size: 13px;
+          line-height: 1.4;
+;
         }
 
         .selected-badge {
           position: absolute;
-          top: 12px;
-          right: 12px;
-          width: 24px;
-          height: 24px;
+          top: 8px;
+          right: 8px;
+          width: 20px;
+          height: 20px;
           background: var(--type-color);
           border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
           color: white;
-          font-size: 14px;
+          font-size: 12px;
           font-weight: 600;
         }
 
@@ -254,23 +477,25 @@ const Home = () => {
           background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
           border: none;
           color: white;
-          padding: 16px;
+          padding: 14px;
           border-radius: 12px;
-          font-size: 18px;
+          font-size: 16px;
           font-weight: 600;
           cursor: pointer;
           transition: all 0.3s;
-          margin-bottom: 20px;
+          margin-bottom: 24px;
         }
 
-        .start-button:hover:not(:disabled) {
+        .start-button:hover:not(.disabled) {
           transform: translateY(-2px);
           box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
         }
 
-        .start-button:disabled {
-          opacity: 0.6;
+        .start-button:disabled,
+        .start-button.disabled {
+          opacity: 0.5;
           cursor: not-allowed;
+          background: #1a1a2e;
         }
 
         .start-button.loading {
@@ -279,8 +504,8 @@ const Home = () => {
         }
 
         .spinner {
-          width: 20px;
-          height: 20px;
+          width: 18px;
+          height: 18px;
           border: 2px solid #ffffff;
           border-top-color: transparent;
           border-radius: 50%;
@@ -295,37 +520,138 @@ const Home = () => {
           transition: transform 0.3s;
         }
 
-        .start-button:hover .arrow {
+        .start-button:hover:not(.disabled) .arrow {
           transform: translateX(4px);
+        }
+
+        .api-config,
+        .redemption-code {
+          background: rgba(26, 26, 46, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 12px;
+          padding: 20px;
+          margin-bottom: 20px;
+        }
+
+        .config-title {
+          color: #e4e4e7;
+          font-size: 14px;
+          font-weight: 600;
+          margin: 0 0 16px;
+          text-align: center;
+        }
+
+        .config-inputs {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .input-group {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .input-label {
+          color: #a1a1aa;
+          font-size: 12px;
+          font-weight: 500;
+        }
+
+        .config-input {
+          background: #0f0f1a;
+          border: 1px solid #16213e;
+          border-radius: 8px;
+          padding: 10px 14px;
+          color: #e4e4e7;
+          font-size: 14px;
+          font-family: inherit;
+          transition: border-color 0.2s;
+        }
+
+        .config-input:focus {
+          outline: none;
+          border-color: #2196F3;
+        }
+
+        .config-input:disabled {
+          opacity: 0kt-allowed;
+        }
+
+        .verify-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          background: #1a1a2e;
+          border: 1px solid #2196F3;
+          color: #2196F3;
+          padding: 10px 20px;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          align-self: flex-start;
+        }
+
+        .verify-btn:hover:not(:disabled) {
+          background: rgba(33, 150, 243, 0.1);
+          transform: translateY(-1px);
+        }
+
+        .verify-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .verify-btn.verifying {
+          opacity: 0.8;
+        }
+
+        .spinner-small {
+          width: 14px;
+          height: 14px;
+          border: 2px solid #2196F3;
+          border-top-color: transparent;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
         }
 
         .error-message {
           background: rgba(244, 67, 54, 0.1);
           border: 1px solid rgba(244, 67, 54, 0.3);
           border-radius: 8px;
-          padding: 12px 16px;
+          padding: 8px 12px;
           text-align: center;
           color: #F44336;
-          font-size: 14px;
+          font-size: 13px;
+          margin-top: 8px;
+        }
+
+        .api-error,
+        .code-error {
+          margin-top: 12px;
         }
 
         .game-info {
           display: flex;
           justify-content: center;
-          gap: 24px;
-          margin-top: 24px;
+          gap: 20px;
+          margin-top: 16px;
         }
 
         .info-item {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 6px;
           color: #a1a1aa;
-          font-size: 13px;
+          font-size: 12px;
         }
 
         .info-icon {
-          font-size: 18px;
+          font-size: 16px;
         }
       `}</style>
     </div>

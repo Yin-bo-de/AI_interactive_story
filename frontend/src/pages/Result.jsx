@@ -1,11 +1,27 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useGame } from '../contexts/GameContext';
+import BackgroundMusic from '../components/BackgroundMusic';
 
 /**
  * 结局展示页面
  */
 const Result = () => {
-  const { ending, background, restartGame, storyType, isLoadingEnding } = useGame();
+  const navigate = useNavigate();
+  const { ending, background, restartGame, storyType, isLoadingEnding, musicEnabled, setMusicEnabled } = useGame();
+
+  // 切换音乐开关
+  const toggleMusic = () => {
+    setMusicEnabled(!musicEnabled);
+    const audio = document.querySelector('audio');
+    if (audio) {
+      if (!musicEnabled) {
+        audio.play().catch(err => console.log('播放失败:', err));
+      } else {
+        audio.pause();
+      }
+    }
+  };
 
   const getStoryTypeName = (type) => {
     const types = {
@@ -16,8 +32,13 @@ const Result = () => {
     return types[type] || type;
   };
 
+  const handleClose = () => {
+    navigate('/');  // 返回首页
+  };
+
   return (
     <div className="result">
+      <BackgroundMusic />
       <div className="result-container">
         {/* 加载中状态 */}
         {isLoadingEnding ? (
@@ -109,6 +130,19 @@ const Result = () => {
         )}
       </div>
 
+      {/* 音乐控制按钮 - 左下角 */}
+      <div
+        className="music-control"
+        onClick={toggleMusic}
+      >
+        <div className="music-icon">
+          {musicEnabled ? '🔊' : '🔇'}
+        </div>
+        <div className="music-label">
+          {musicEnabled ? '音乐开' : '音乐关'}
+        </div>
+      </div>
+
       <style jsx>{`
         .result {
           min-height: 100vh;
@@ -117,6 +151,37 @@ const Result = () => {
           align-items: center;
           justify-content: center;
           padding: 20px;
+        }
+
+        .music-control {
+          position: fixed;
+          bottom: 20px;
+          left: 20px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: rgba(26, 26, 46, 0.9);
+          border: 1px solid #16213e;
+          border-radius: 8px;
+          padding: 8px 12px;
+          cursor: pointer;
+          z-index: 1000;
+          transition: all 0.3s ease;
+        }
+
+        .music-control:hover {
+          background: rgba(22, 33, 62, 0.95);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .music-icon {
+          font-size: 20px;
+        }
+
+        .music-label {
+          color: #e4e4e7;
+          font-size: 12px;
+          font-weight: 500;
         }
 
         .result-container {
@@ -293,6 +358,18 @@ const Result = () => {
 
         .action-button.primary:hover {
           box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+        }
+
+        .action-button.secondary {
+          background: #1a1a2e;
+          border: 2px solid #52525b;
+          color: #a1a1aa;
+        }
+
+        .action-button.secondary:hover {
+          background: #2a2a3e;
+          border-color: #71717a;
+          color: #e4e4e7;
         }
       `}</style>
     </div>

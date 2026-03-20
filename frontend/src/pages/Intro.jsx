@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../contexts/GameContext';
 import Typewriter from '../components/Typewriter';
+import BackgroundMusic from '../components/BackgroundMusic';
 
 /**
  * 开场介绍页面
@@ -11,12 +12,15 @@ const Intro = () => {
   const navigate = useNavigate();
   const {
     sessionId,
+    storyType,
     background,
     characters,
     userIdentity,
     gameStatus,
     enterScene,
-    error
+    error,
+    musicEnabled,
+    setMusicEnabled
   } = useGame();
 
   const [currentSection, setCurrentSection] = useState(0);
@@ -32,6 +36,31 @@ const Intro = () => {
       navigate('/game', { replace: true });
     }
   }, [sessionId, gameStatus, navigate]);
+
+  // 更新音乐播放状态
+  useEffect(() => {
+    const audio = document.querySelector('audio');
+    if (audio) {
+      if (musicEnabled) {
+        audio.play().catch(err => console.log('播放失败:', err));
+      } else {
+        audio.pause();
+      }
+    }
+  }, [musicEnabled]);
+
+  // 切换音乐开关
+  const toggleMusic = () => {
+    setMusicEnabled(!musicEnabled);
+    const audio = document.querySelector('audio');
+    if (audio) {
+      if (!musicEnabled) {
+        audio.play().catch(err => console.log('播放失败:', err));
+      } else {
+        audio.pause();
+      }
+    }
+  };
 
   // 处理背景故事展示完成
   const handleBackgroundComplete = () => {
@@ -53,12 +82,26 @@ const Intro = () => {
     }, 500);
   };
 
+  // 处理点击进度步骤（仅可查看已完成的步骤）
+  const handleStepClick = (step) => {
+    if (step >= currentSection) return; // 不能跳转到未完成的步骤
+    if (step === currentSection) return;
+
+    // 重置相关状态
+    setShowEnterButton(false);
+    setShowBackgroundContinue(false);
+
+    // 切换到目标步骤
+    setCurrentSection(step);
+  };
+
   // 处理用户身份展示完成
   const handleIdentityComplete = () => {
     setTimeout(() => {
       setShowEnterButton(true);
     }, 500);
   };
+
 
   // 处理进入现场
   const handleEnterScene = async () => {
@@ -71,6 +114,7 @@ const Intro = () => {
       setIsEntering(false);
     }
   };
+
 
   // 渲染当前部分
   const renderSection = () => {
@@ -99,53 +143,62 @@ const Intro = () => {
         );
       case 1:
         return (
-          <div className="intro-section characters-section">
-            <div className="section-icon">👥</div>
-            <h2 className="section-title">剧中人物</h2>
-            <div className="characters-list">
-              {characters.map((char, index) => (
-                <div
-                  key={index}
-                  className="character-card"
-                  style={{ animationDelay: `${index * 0.3}s` }}
-                >
-                  <div className="character-avatar">
-                    {char.avatar || '👤'}
+          <>
+            <div className="intro-section characters-section">
+              <div className="section-icon">👥</div>
+              <h2 className="section-title">剧中人物</h2>
+              <div className="characters-list">
+                {characters.map((char, index) => (
+                  <div
+                    key={index}
+                    className="character-card"
+                    style={{ animationDelay: `${index * 0.3}s` }}
+                  >
+                    <div className="character-avatar">
+                      {char.avatar || '👤'}
+                    </div>
+                    <div className="character-info">
+                      <div className="character-name">{char.name}</div>
+                      <div className="character-description">{char.description}</div>
+                    </div>
                   </div>
-                  <div className="character-info">
-                    <div className="character-name">{char.name}</div>
-                    <div className="character-description">{char.description}</div>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
+              <button
+                className="continue-button"
+                onClick={handleCharactersComplete}
+              >
+                继续 →
+              </button>
             </div>
-            <button
-              className="continue-button"
-              onClick={handleCharactersComplete}
-            >
-              继续 →
-            </button>
-          </div>
+          </>
         );
       case 2:
         return (
-          <div className="intro-section identity-section">
-            <div className="section-icon">🎭</div>
-            <h2 className="section-title">你的身份</h2>
-            <div className="identity-card">
-              <div className="identity-role">
-                <Typewriter
-                  text={userIdentity?.role || '侦探助理'}
-                  speed={50}
-                  onComplete={handleIdentityComplete}
-                  showCursor={false}
-                />
-              </div>
-              <div className="identity-description">
-                {userIdentity?.description || '协助探长侦破案件的关键人物'}
+          <>
+            <div className="intro-section identity-section">
+              <div className="section-icon">🎭</div>
+              <h2 className="section-title">你的身份</h2>
+              <div className="identity-card">
+                <div className="identity-role" style={{ marginBottom: '24px' }}>
+                  <Typewriter
+                    text={userIdentity?.role || '侦探助理'}
+                    speed={50}
+                    showCursor={true}
+                  />
+                </div>
+                <div className="typewriter-container" style={{ textAlign: 'left', margin: 0, background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <Typewriter
+                    text={userIdentity?.description || '协助探长侦破案件的关键人物'}
+                    speed={35}
+                    showCursor={true}
+                    delay={800}
+                    onComplete={handleIdentityComplete}
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          </>
         );
       default:
         return null;
@@ -154,13 +207,29 @@ const Intro = () => {
 
   return (
     <div className="intro-page">
+      <BackgroundMusic storyType={storyType} />
+
+      {/* 音乐控制按钮 - 左下角 */}
+      <div
+        className="music-control"
+        onClick={toggleMusic}
+      >
+        <div className="music-icon">
+          {musicEnabled ? '🔊' : '🔇'}
+        </div>
+        <div className="music-label">
+          {musicEnabled ? '音乐开' : '音乐关'}
+        </div>
+      </div>
+
       <div className="intro-container">
         {/* 进度指示器 */}
         <div className="progress-indicator">
           {[0, 1, 2].map((step) => (
             <div
               key={step}
-              className={`progress-step ${currentSection > step ? 'completed' : ''} ${currentSection === step ? 'active' : ''}`}
+              className={`progress-step ${currentSection > step ? 'completed' : ''} ${currentSection === step ? 'active' : ''} ${step >= currentSection ? 'disabled' : ''}`}
+              onClick={() => handleStepClick(step)}
             >
               <div className="step-number">{step + 1}</div>
             </div>
@@ -228,6 +297,17 @@ const Intro = () => {
 
         .progress-step {
           position: relative;
+          cursor: pointer;
+          transition: transform 0.2s ease;
+        }
+
+        .progress-step.disabled {
+          cursor: not-allowed;
+          opacity: 0.6;
+        }
+
+        .progress-step:not(.disabled):hover {
+          transform: scale(1.15);
         }
 
         .step-number {
@@ -270,6 +350,7 @@ const Intro = () => {
           text-align: center;
           width: 100%;
           animation: fadeInUp 0.5s ease;
+          position: relative;
         }
 
         @keyframes fadeInUp {
@@ -391,6 +472,7 @@ const Intro = () => {
           color: white;
         }
 
+
         /* 身份介绍区域 */
         .identity-card {
           background: linear-gradient(135deg, rgba(33, 150, 243, 0.1) 0%, rgba(156, 39, 176, 0.1) 100%);
@@ -486,6 +568,38 @@ const Intro = () => {
           color: #F44336;
           font-size: 14px;
           margin-top: 20px;
+        }
+
+        /* 音乐控制 */
+        .music-control {
+          position: fixed;
+          bottom: 20px;
+          left: 20px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: rgba(26, 26, 46, 0.9);
+          border: 1px solid #16213e;
+          border-radius: 8px;
+          padding: 8px 12px;
+          cursor: pointer;
+          z-index: 1000;
+          transition: all 0.3s ease;
+        }
+
+        .music-control:hover {
+          background: rgba(22, 33, 62, 0.95);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .music-icon {
+          font-size: 20px;
+        }
+
+        .music-label {
+          color: #e4e4e7;
+          font-size: 12px;
+          font-weight: 500;
         }
       `}</style>
     </div>

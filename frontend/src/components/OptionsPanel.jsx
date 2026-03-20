@@ -4,6 +4,7 @@ import { useGame } from '../contexts/GameContext';
 /**
  * 引导选项面板组件
  * 显示AI提供的引导选项
+ * 固定在右侧，铺满聊天框右侧
  */
 const OptionsPanel = ({ options, onOptionClick }) => {
   const { isSending } = useGame();
@@ -35,24 +36,24 @@ const OptionsPanel = ({ options, onOptionClick }) => {
       <style jsx>{`
         .options-panel {
           position: fixed;
-          right: calc(50% - 900px);
-          top: 50%;
-          transform: translateY(-50%);
-          width: 260px;
+          top: 80px;
+          right: 0;
+          width: 340px;
+          height: calc(100vh - 140px);
           background: rgba(26, 26, 46, 0.95);
-          border: 1px solid #2196F3;
-          border-radius: 12px;
-          padding: 16px;
+          border-left: 1px solid #16213e;
           z-index: 10;
-          backdrop-filter: blur(10px);
-          box-shadow: 0 4px 20px rgba(33, 150, 243, 0.2);
+          display: flex;
+          flex-direction: column;
         }
 
         .options-header {
           display: flex;
           align-items: center;
-          gap: 8px;
-          margin-bottom: 16px;
+          gap: 10px;
+          padding: 16px 24px;
+          background: rgba(22, 33, 62, 0.95);
+          border-bottom: 1px solid #16213e;
         }
 
         .options-icon {
@@ -60,35 +61,38 @@ const OptionsPanel = ({ options, onOptionClick }) => {
         }
 
         .options-title {
-          color: #a1a1aa;
-          font-size: 13px;
-          font-weight: 500;
+          color: #e4e4e7;
+          font-size: 14px;
+          font-weight: 600;
         }
 
         .options-grid {
+          flex: 1;
+          padding: 24px 24px 40px 24px;
           display: flex;
           flex-direction: column;
           gap: 12px;
+          overflow-y: auto;
         }
 
         .option-card {
           display: flex;
           align-items: center;
-          gap: 10px;
-          background: #0f0f1a;
-          border: 1px solid #16213e;
+          gap: 12px;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 8px;
-          padding: 16px 16px;
-          min-height: 60px;
+          padding: 16px 20px;
+          min-height: 50px;
           text-align: left;
           cursor: pointer;
           transition: all 0.2s;
         }
 
         .option-card:hover:not(.disabled) {
-          background: #16213e;
+          background: rgba(33, 150, 243, 0.15);
           border-color: #2196F3;
-          transform: translateY(-2px);
+          transform: translateX(-4px);
         }
 
         .option-card.disabled {
@@ -112,8 +116,27 @@ const OptionsPanel = ({ options, onOptionClick }) => {
 
         .option-text {
           color: #e4e4e7;
-          font-size: 13px;
+          font-size: 14px;
           line-height: 1.4;
+          flex: 1;
+        }
+
+        /* 滚动条样式 */
+        .options-grid::-webkit-scrollbar {
+          width: 4px;
+        }
+
+        .options-grid::-webkit-scrollbar-track {
+          background: rgba(0, 0, 0, 0.2);
+        }
+
+        .options-grid::-webkit-scrollbar-thumb {
+          background: #3f3f46;
+          border-radius: 2px;
+        }
+
+        .options-grid::-webkit-scrollbar-thumb:hover {
+          background: #52525b;
         }
       `}</style>
     </div>
