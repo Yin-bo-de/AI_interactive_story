@@ -1,0 +1,8 @@
+{
+  "7FUF-0UZG-1NQT-69KL": {
+    "api_key": "sk-7d4bff0417a84819882e477cdfe90565",
+    "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+    "model_name": "qwen3.5-plus",
+    "remaining_games": 10
+  }
+}

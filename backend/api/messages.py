@@ -7,6 +7,8 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from typing import Optional, Any
 from datetime import datetime
+import json
+from loguru import logger
 
 from ..services import get_session_service, get_story_service
 from ..models.dialogue import DialogueMessage, MessageRole
@@ -14,6 +16,16 @@ from ..models.session import SessionStatus
 
 
 router = APIRouter(prefix="/sessions/{session_id}/messages", tags=["messages"])
+
+
+# 获取自定义故事服务实例
+def _get_custom_story_service(session_id: str):
+    """获取自定义故事服务实例"""
+    try:
+        from .sessions import _custom_story_services
+        return _custom_story_services.get(session_id)
+    except:
+        return None
 
 
 # 请求/响应模型
@@ -76,7 +88,8 @@ async def send_message(session_id: str, request: SendMessageRequest):
     session.check_game_over()
     if session.status == SessionStatus.ENDED:
         # 游戏时间到，生成结局
-        ending = await _generate_game_ending(session, session_service, story_service)
+        custom_story_service = _get_custom_story_service(session_id) or story_service
+        ending = await _generate_game_ending(session, session_service, custom_story_service)
         return SendMessageResponse(
             ai_message="时间到了，让我们来揭晓最终的真相...",
             options=[],
@@ -94,8 +107,11 @@ async def send_message(session_id: str, request: SendMessageRequest):
         )
         session.dialogue_history.add_message(user_message)
 
+        # 获取自定义故事服务实例（如果有）
+        custom_story_service = _get_custom_story_service(session_id) or story_service
+
         # 继续故事，生成AI回复
-        result = await story_service.continue_story(session, request.content)
+        result = await custom_story_service.continue_story(session, request.content)
 
         # 添加AI回复到历史
         ai_message = DialogueMessage(
@@ -115,7 +131,7 @@ async def send_message(session_id: str, request: SendMessageRequest):
 
         # 如果游戏结束，生成结局
         if game_over:
-            ending = await _generate_game_ending(session, session_service, story_service)
+            ending = await _generate_game_ending(session, session_service, custom_story_service)
             return SendMessageResponse(
                 ai_message=result["message"],
                 options=result.get("options", []),
@@ -140,6 +156,8 @@ async def send_message(session_id: str, request: SendMessageRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"处理消息失败: {str(e)}"
         )
+
+
 
 
 @router.get("", response_model=GetMessagesResponse)

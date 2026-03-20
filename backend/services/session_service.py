@@ -24,7 +24,10 @@ class SessionService:
         user_id: Optional[str] = None,
         story_type: str = "mystery",
         max_duration_seconds: int = 1800,
-        max_rounds: int = 100
+        max_rounds: int = 100,
+        api_key: Optional[str] = None,
+        api_base: Optional[str] = None,
+        model_name: Optional[str] = None
     ) -> GameSession:
         """
         创建新会话
@@ -34,6 +37,9 @@ class SessionService:
             story_type: 故事类型
             max_duration_seconds: 最大持续时间（秒）
             max_rounds: 最大轮次
+            api_key: API Key（可选）
+            api_base: API Base URL（可选）
+            model_name: 模型名称（可选）
 
         Returns:
             创建的会话对象
@@ -51,7 +57,10 @@ class SessionService:
             max_duration_seconds=max_duration_seconds,
             max_rounds=max_rounds,
             dialogue_history=DialogueHistory(session_id=session_id),
-            story_state=StoryState()
+            story_state=StoryState(),
+            api_key=api_key,
+            api_base=api_base,
+            model_name=model_name
         )
 
         self.sessions[session_id] = session

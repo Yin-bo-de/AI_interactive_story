@@ -4,6 +4,7 @@
 """
 
 import os
+import json
 from typing import Optional, Any, List, Dict
 from loguru import logger
 
@@ -13,12 +14,14 @@ from ..prompts import get_init_prompt, get_opening_roleplay_prompt, get_scene_in
 from .llm_service import get_llm_service
 
 
+
+
 class StoryService:
     """故事逻辑服务"""
 
-    def __init__(self):
+    def __init__(self, llm_service: Optional["LLMService"] = None):
         """初始化故事服务"""
-        self.llm_service = get_llm_service()
+        self.llm_service = llm_service or get_llm_service()
         logger.info("故事服务初始化完成")
 
     async def initialize_story(
@@ -214,7 +217,7 @@ class StoryService:
             )
             logger.info(f"生成继续故事Prompt: {prompt[:100]}...")
             result = await self.llm_service.call_llm_json(prompt)
-            logger.info(f"生成继续故事结果: {result.get('message', '')[:50]}...")   
+            logger.info(f"生成继续故事结果: {result.get('message', '')[:50]}...")
 
             # 处理新线索
             new_clue = result.get("new_clue")
@@ -236,6 +239,7 @@ class StoryService:
         except Exception as e:
             logger.error(f"继续故事失败: {e}")
             raise
+
 
     def _format_clues_summary(self, clues: List[Clue]) -> str:
         """

@@ -16,6 +16,20 @@ from ..models.session import SessionStatus
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 logger = logging.getLogger(__name__)
 
+# 存储自定义故事服务实例 {session_id: story_service}
+_custom_story_services = {}
+
+# 存储兑换码 {code: {"api_key": ..., "api_base": ..., "model_name": ..., "remaining_games": ...}}
+# 格式: "XXXX-XXXX-XXXX-XXXX": {"api_key": "xxx", "api_base": "xxx", "model_name": "xxx", "remaining_games": 10}
+_redemption_codes = {
+  "7FUF-0UZG-1NQT-69KL": {
+    "api_key": "sk-7d4bff0417a84819882e477cdfe90565",
+    "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "model_name": "qwen3.5-plus",
+    "remaining_games": 10
+  }
+}
+
 
 # 请求/响应模型
 class CreateSessionRequest(BaseModel):
@@ -24,6 +38,10 @@ class CreateSessionRequest(BaseModel):
     story_type: str = Field(default="mystery", description="故事类型")
     max_duration_seconds: int = Field(default=1800, description="最大持续时间（秒）")
     max_rounds: int = Field(default=100, description="最大轮次")
+    api_key: Optional[str] = Field(None, description="API Key（可选）")
+    api_base: Optional[str] = Field(None, description="API Base URL（可选）")
+    model_name: Optional[str] = Field(None, description="模型名称（可选）")
+    redemption_code: Optional[str] = Field(None, description="兑换码（可选）")
 
 
 class CreateSessionResponse(BaseModel):
@@ -84,17 +102,64 @@ async def create_session(request: CreateSessionRequest):
     session_service = get_session_service()
     story_service = get_story_service()
 
+    # 处理兑换码
+    api_key = request.api_key
+    api_base = request.api_base
+    model_name = request.model_name
+
+    if request.redemption_code:
+        global _redemption_codes
+        if request.redemption_code in _redemption_codes:
+            code_info = _redemption_codes[request.redemption_code]
+            if code_info["remaining_games"] > 0:
+                # 使用兑换码中的配置
+                api_key = code_info["api_key"]
+                api_base = code_info["api_base"]
+                model_name = code_info["model_name"]
+                # 减少游戏次数
+                code_info["remaining_games"] -= 1
+                logger.info(f"使用兑换码 {request.redemption_code}，剩余游戏次数: {code_info['remaining_games']}")
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="该兑换码游戏次数已用完"
+                )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="兑换码不存在或已失效"
+            )
+
     # 创建会话
     session = session_service.create_session(
         user_id=request.user_id,
         story_type=request.story_type,
         max_duration_seconds=request.max_duration_seconds,
-        max_rounds=request.max_rounds
+        max_rounds=request.max_rounds,
+        api_key=api_key,
+        api_base=api_base,
+        model_name=model_name
     )
 
+    # 创建故事服务实例，如果提供了API配置则使用新的LLM服务实例
+    if api_key and api_base:
+        from ..services.llm_service import LLMService
+        from ..services.story_service import StoryService
+        custom_llm_service = LLMService(
+            api_key=api_key,
+            api_base=api_base,
+            model_name=model_name
+        )
+        custom_story_service = StoryService(llm_service=custom_llm_service)
+        # 将自定义服务实例存储到全局字典中
+        global _custom_story_services
+        _custom_story_services[session.session_id] = custom_story_service
+
     try:
+        # 使用自定义服务实例（如果有）
+        current_story_service = _custom_story_services.get(session.session_id, story_service)
         # 初始化故事
-        story_init = await story_service.initialize_story(session, request.story_type)
+        story_init = await current_story_service.initialize_story(session, request.story_type)
 
         # 更新会话状态为等待用户进入现场
         session.status = SessionStatus.WAITING
@@ -131,6 +196,10 @@ async def enter_scene(session_id: str):
     story_service = get_story_service()
     timer_service = get_timer_service()
 
+    # 获取自定义的故事服务实例（如果有）
+    global _custom_story_services
+    current_story_service = _custom_story_services.get(session_id, story_service)
+
     session = session_service.get_session(session_id)
     if not session:
         raise HTTPException(
@@ -146,7 +215,7 @@ async def enter_scene(session_id: str):
 
     try:
         # 生成现场介绍消息
-        scene_intro = await story_service.generate_scene_intro(session)
+        scene_intro = await current_story_service.generate_scene_intro(session)
 
         # 更新会话状态为活跃
         session.status = SessionStatus.ACTIVE
@@ -277,6 +346,150 @@ class EndGameResponse(BaseModel):
     clues_explanation: str = Field(..., description="线索解释")
     player_evaluation: str = Field(..., description="玩家评价")
     rating: float = Field(..., description="评分")
+
+
+class VerifyAPIRequest(BaseModel):
+    """验证API请求"""
+    api_key: str = Field(..., description="API Key")
+    api_base: str = Field(..., description="API Base URL")
+    model_name: str = Field(default="gpt-4o", description="模型名称")
+
+
+class VerifyAPIResponse(BaseModel):
+    """验证API响应"""
+    success: bool = Field(..., description="验证是否成功")
+    message: str = Field(..., description="验证结果结果消息")
+
+
+class VerifyCodeRequest(BaseModel):
+    """验证兑换码请求"""
+    code: str = Field(..., description="兑换码")
+
+
+class VerifyCodeResponse(BaseModel):
+    """验证兑换码响应"""
+    success: bool = Field(..., description="验证是否成功")
+    message: str = Field(..., description="验证结果消息")
+    remaining_games: int = Field(default=0, description="剩余游戏次数")
+    api_key: Optional[str] = Field(None, description="API Key")
+    api_base: Optional[str] = Field(None, description="API Base URL")
+    model_name: Optional[str] = Field(None, description="模型名称")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "message": "兑换码验证成功",
+                "remaining_games": 10,
+                "api_key": "sk-xxx",
+                "api_base": "https://api.openai.com/v1",
+                "model_name": "gpt-4o"
+            }
+        }
+
+
+@router.post("/verify-api", response_model=VerifyAPIResponse, status_code=status.HTTP_200_OK)
+async def verify_api(request: VerifyAPIRequest):
+    """
+    验证API Key和Base URL是否正确
+
+    发送一个简单的测试请求来验证API配置是否有效
+    """
+    from ..services.llm_service import LLMService
+    from httpx import AsyncClient, Timeout
+
+    try:
+        test_api_key = request.api_key
+        test_api_base = request.api_base.rstrip('/')
+        test_model_name = request.model_name
+
+        headers = {
+            "Authorization": f"Bearer {test_api_key}",
+            "Content-Type": "application/json"
+        }
+
+        data = {
+            "model": test_model_name,
+            "messages": [{"role": "user", "content": "test"}],
+            "max_tokens": 10,
+            "temperature": 0.8
+        }
+
+        async with AsyncClient(timeout=Timeout(30.0)) as client:
+            response = await client.post(test_api_base, headers=headers, json=data)
+
+            if response.status_code == 200:
+                result = response.json()
+                if "choices" in result or "content" in result:
+                    return VerifyAPIResponse(
+                        success=True,
+                        message="API验证成功"
+                    )
+
+            if response.status_code == 401:
+                return VerifyAPIResponse(
+                    success=False,
+                    message="API Key无效"
+                )
+
+            error_detail = "API验证失败"
+            try:
+                error_data = response.json()
+                if "error" in error_data:
+                    error_detail = error_data["error"].get("message", str(error_data["error"]))
+            except:
+                pass
+
+            return VerifyAPIResponse(
+                success=False,
+                message=error_detail
+            )
+
+    except Exception as e:
+        logger.error(f"验证API失败: {e}")
+        return VerifyAPIResponse(
+            success=False,
+            message=f"API验证失败: {str(e)}"
+        )
+
+
+@router.post("/verify-code", response_model=VerifyCodeResponse, status_code=status.HTTP_200_OK)
+async def verify_code(request: VerifyCodeRequest):
+    """
+    验证兑换码
+
+    验证兑换码是否有效，返回剩余游戏次数和API配置信息
+    """
+    global _redemption_codes
+
+    if not request.code or len(request.code) != 19:
+        return VerifyCodeResponse(
+            success=False,
+            message="兑换码格式不正确"
+        )
+
+    if request.code not in _redemption_codes:
+        return VerifyCodeResponse(
+            success=False,
+            message="兑换码不存在或已失效"
+        )
+
+    code_info = _redemption_codes[request.code]
+
+    if code_info["remaining_games"] <= 0:
+        return VerifyCodeResponse(
+            success=False,
+            message="该兑换码游戏次数已用完"
+        )
+
+    return VerifyCodeResponse(
+        success=True,
+        message="兑换码验证成功",
+        remaining_games=code_info["remaining_games"],
+        api_key=code_info["api_key"],
+        api_base=code_info["api_base"],
+        model_name=code_info["model_name"]
+    )
 
 
 @router.post("/{session_id}/end-game", response_model=EndGameResponse, status_code=status.HTTP_200_OK)

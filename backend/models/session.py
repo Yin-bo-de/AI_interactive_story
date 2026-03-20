@@ -41,6 +41,11 @@ class GameSession(BaseModel):
     # 统计
     total_messages: int = Field(default=0, description="总消息数")
 
+    # API配置
+    api_key: Optional[str] = Field(None, description="API Key（可选）")
+    api_base: Optional[str] = Field(None, description="API Base URL（可选）")
+    model_name: Optional[str] = Field(None, description="模型名称（可选）")
+
     @property
     def elapsed_time(self) -> float:
         """获取已过时间（秒）"""
