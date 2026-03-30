@@ -46,9 +46,28 @@ class StoryService:
 
             # 更新会话的故事状态
             session.story_state.background = result.get("background", "")
-            session.story_state.characters = [
-                Character(**char) for char in result.get("characters", [])
-            ]
+            # 处理角色数据，自动生成id如果不存在
+            characters_data = result.get("characters", [])
+            processed_characters = []
+            for i, char in enumerate(characters_data):
+                # 如果没有id，自动生成
+                if "id" not in char or not char["id"]:
+                    char["id"] = f"char_{i}_{char.get('name', 'unknown').lower().replace(' ', '_')}"
+                # 补充默认字段
+                if "personality" not in char:
+                    char["personality"] = ""
+                if "speaking_style" not in char:
+                    char["speaking_style"] = ""
+                if "priority" not in char:
+                    char["priority"] = 1 if i == 0 else 2  # 第一个角色是主控，优先级1
+                if "is_active" not in char:
+                    char["is_active"] = True  # 默认激活所有角色
+                if "known_clues" not in char:
+                    char["known_clues"] = []
+                if "relationships" not in char:
+                    char["relationships"] = {}
+                processed_characters.append(Character(**char))
+            session.story_state.characters = processed_characters
             session.story_state.ending_seeds = [
                 EndingSeed(**seed) for seed in result.get("ending_seeds", [])
             ]
@@ -102,8 +121,13 @@ class StoryService:
             if not main_character:
                 logger.warning("没有找到角色，使用默认探长")
                 main_character = Character(
+                    id="detective_lin",
                     name="林默",
-                    description="一位经验丰富的侦探"
+                    description="一位经验丰富的侦探",
+                    personality="冷静严谨，观察力敏锐",
+                    speaking_style="说话简洁，逻辑性强",
+                    avatar=None,
+                    last_speak_time=None
                 )
 
             # 生成开场角色扮演消息
@@ -112,7 +136,7 @@ class StoryService:
                 character_description=main_character.description,
                 background=session.story_state.background,
                 opening_scene=opening_scene,
-                user_identity=session.story_state.user_identity.model_dump() if session.story_state.user_identity else None
+                user_identity=session.story_state.user_identity.model_dump() if session.story_state.user_identity else {"role": "侦探助理", "description": ""}
             )
 
             result = await self.llm_service.call_llm_json(prompt)
@@ -145,8 +169,13 @@ class StoryService:
             if not main_character:
                 logger.warning("没有找到角色，使用默认探长")
                 main_character = Character(
+                    id="detective_lin",
                     name="林默",
-                    description="一位经验丰富的侦探"
+                    description="一位经验丰富的侦探",
+                    personality="冷静严谨，观察力敏锐",
+                    speaking_style="说话简洁，逻辑性强",
+                    avatar=None,
+                    last_speak_time=None
                 )
 
             # 生成现场介绍消息
@@ -155,7 +184,7 @@ class StoryService:
                 character_description=main_character.description,
                 background=session.story_state.background,
                 opening_scene=session.story_state.opening_scene,
-                user_identity=session.story_state.user_identity.model_dump() if session.story_state.user_identity else None
+                user_identity=session.story_state.user_identity.model_dump() if session.story_state.user_identity else {"role": "侦探助理", "description": ""}
             )
 
             result = await self.llm_service.call_llm_json(prompt)
@@ -189,8 +218,13 @@ class StoryService:
             main_character = session.story_state.characters[0] if session.story_state.characters else None
             if not main_character:
                 main_character = Character(
+                    id="detective_lin",
                     name="林默",
-                    description="一位经验丰富的侦探"
+                    description="一位经验丰富的侦探",
+                    personality="冷静严谨，观察力敏锐",
+                    speaking_style="说话简洁，逻辑性强",
+                    avatar=None,
+                    last_speak_time=None
                 )
 
             # 准备线索摘要

@@ -45,7 +45,7 @@ const CharacterInfo = () => {
           height: calc(100vh - 140px);
           background: rgba(26, 26, 46, 0.95);
           border-right: 1px solid #16213e;
-          z-index: 10;
+          z-index: 90;
           display: flex;
           flex-direction: column;
         }

@@ -5,6 +5,7 @@ import ChatContainer from '../components/ChatContainer';
 import InputArea from '../components/InputArea';
 import OptionsPanel from '../components/OptionsPanel';
 import CharacterInfo from '../components/CharacterInfo';
+import CharacterList from '../components/CharacterList';
 import BackgroundMusic from '../components/BackgroundMusic';
 
 /**
@@ -25,7 +26,8 @@ const Game = () => {
     maxRounds,
     totalMessages,
     musicEnabled,
-    setMusicEnabled
+    setMusicEnabled,
+    isGroupChatMode
   } = useGame();
 
   // 检查游戏状态
@@ -64,10 +66,11 @@ const Game = () => {
 
   // 切换音乐开关
   const toggleMusic = () => {
-    setMusicEnabled(!musicEnabled);
+    const newMusicEnabled = !musicEnabled;
+    setMusicEnabled(newMusicEnabled);
     const audio = document.querySelector('audio');
     if (audio) {
-      if (!musicEnabled) {
+      if (newMusicEnabled) {
         audio.play().catch(err => console.log('播放失败:', err));
       } else {
         audio.pause();
@@ -101,6 +104,9 @@ const Game = () => {
       <InputArea />
 
       <CharacterInfo />
+
+      {/* 群聊模式下显示右侧成员列表 */}
+      {isGroupChatMode && <CharacterList />}
 
       {/* 音乐控制按钮 - 左下角 */}
       <div

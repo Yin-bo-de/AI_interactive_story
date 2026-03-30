@@ -4,7 +4,7 @@
 """
 
 from enum import Enum
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel, Field
 
@@ -45,6 +45,10 @@ class GameSession(BaseModel):
     api_key: Optional[str] = Field(None, description="API Key（可选）")
     api_base: Optional[str] = Field(None, description="API Base URL（可选）")
     model_name: Optional[str] = Field(None, description="模型名称（可选）")
+
+    # 群聊相关
+    current_speaker_queue: List[str] = Field(default_factory=list, description="待发言角色队列")
+    last_speaker: Optional[str] = Field(None, description="上一个发言的角色ID")
 
     @property
     def elapsed_time(self) -> float:

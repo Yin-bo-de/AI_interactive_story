@@ -35,13 +35,15 @@ class LLMService:
         )
         logger.info(f"LLM服务初始化完成: {self.provider}/{self.model_name}")
 
-    async def call_llm(self, prompt: str, system_prompt: Optional[str] = None) -> str:
+    async def call_llm(self, prompt: str, system_prompt: Optional[str] = None, temperature: float = 0.8, response_format: Optional[str] = None) -> str:
         """
         调用LLM API
 
         Args:
             prompt: 用户提示
             system_prompt: 系统提示（可选）
+            temperature: 温度参数，控制随机性（0-1）
+            response_format: 响应格式，可选"json"
 
         Returns:
             LLM返回的文本内容
@@ -55,16 +57,16 @@ class LLMService:
             response_text = ""
             # 适配不同的API提供商
             if self.provider == "openai":
-                response_text = await self._call_openai(messages)
+                response_text = await self._call_openai(messages, temperature, response_format)
             elif self.provider == "zhipuai":
-                response_text = await self._call_zhipuai(messages)
+                response_text = await self._call_zhipuai(messages, temperature)
             elif self.provider == "deepseek":
-                response_text = await self._call_deepseek(messages)
+                response_text = await self._call_deepseek(messages, temperature)
             elif self.provider == "anthropic":
-                response_text = await self._call_anthropic(messages)
+                response_text = await self._call_anthropic(messages, temperature)
             else:
                 logger.warning(f"未知的API提供商: {self.provider}, 使用OpenAI兼容接口")
-                response_text = await self._call_openai(messages)
+                response_text = await self._call_openai(messages, temperature, response_format)
 
             logger.debug(f"LLM响应: {response_text[:100]}...")
             return response_text
@@ -72,6 +74,12 @@ class LLMService:
         except Exception as e:
             logger.error(f"调用LLM API失败: {e}")
             raise
+
+    async def generate_response(self, prompt: str, system_prompt: Optional[str] = None, temperature: float = 0.8, response_format: Optional[str] = None) -> str:
+        """
+        生成回复（兼容群聊服务调用）
+        """
+        return await self.call_llm(prompt, system_prompt, temperature, response_format)
 
     async def call_llm_stream(self, prompt: str, system_prompt: Optional[str] = None) -> AsyncGenerator[str, None]:
         """
@@ -112,23 +120,29 @@ class LLMService:
             logger.error(f"流式调用LLM API失败: {e}")
             raise
 
-    async def _call_openai(self, messages: List[Dict]) -> str:
+    async def _call_openai(self, messages: List[Dict], temperature: float = 0.8, response_format: Optional[str] = None) -> str:
         """调用OpenAI兼容API"""
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model_name,
-                messages=messages,
-                temperature=0.8,
-                extra_body={
+            kwargs = {
+                "model": self.model_name,
+                "messages": messages,
+                "temperature": temperature,
+                "extra_body": {
                     "enable_thinking": False # 是否开启深度思考
                 }
-            )
+            }
+
+            # 如果要求JSON格式，添加response_format参数
+            if response_format == "json":
+                kwargs["response_format"] = {"type": "json_object"}
+
+            response = await self.client.chat.completions.create(**kwargs)
             return response.choices[0].message.content or ""
         except (APIError, APIConnectionError, RateLimitError) as e:
             logger.error(f"OpenAI API调用错误: {type(e).__name__}: {e}")
             raise
 
-    async def _call_zhipuai(self, messages: List[Dict]) -> str:
+    async def _call_zhipuai(self, messages: List[Dict], temperature: float = 0.8) -> str:
         """调用智谱AI API"""
         # 处理API地址，确保包含/chat/completions后缀
         if self.api_base.endswith("/chat/completions"):
@@ -142,7 +156,7 @@ class LLMService:
         data = {
             "model": self.model_name,
             "messages": messages,
-            "temperature": 0.8,
+            "temperature": temperature,
             "max_tokens": 2000
         }
 
@@ -151,7 +165,7 @@ class LLMService:
         result = response.json()
         return result["choices"][0]["message"]["content"]
 
-    async def _call_deepseek(self, messages: List[Dict]) -> str:
+    async def _call_deepseek(self, messages: List[Dict], temperature: float = 0.8) -> str:
         """调用DeepSeek API"""
         # 处理API地址，确保包含/chat/completions后缀
         if self.api_base.endswith("/chat/completions"):
@@ -165,7 +179,7 @@ class LLMService:
         data = {
             "model": self.model_name,
             "messages": messages,
-            "temperature": 0.8,
+            "temperature": temperature,
             "max_tokens": 2000
         }
 
@@ -174,7 +188,7 @@ class LLMService:
         result = response.json()
         return result["choices"][0]["message"]["content"]
 
-    async def _call_anthropic(self, messages: List[Dict]) -> str:
+    async def _call_anthropic(self, messages: List[Dict], temperature: float = 0.8) -> str:
         """调用Anthropic Claude API"""
         url = f"{self.api_base}"
         headers = {
@@ -198,7 +212,7 @@ class LLMService:
         data = {
             "model": self.model_name,
             "max_tokens": 2000,
-            "temperature": 0.8,
+            "temperature": temperature,
             "system": system,
             "messages": anthropic_messages
         }

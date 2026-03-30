@@ -219,6 +219,62 @@ async def enter_scene(session_id: str):
         # 更新会话状态为活跃
         session.status = SessionStatus.ACTIVE
         session.start_time = datetime.now()  # 重置开始时间，从进入现场开始计时
+
+        # 激活所有角色（群聊模式）
+        for char in session.story_state.characters:
+            char.is_active = True
+
+        # 创建群聊欢迎消息（系统消息）
+        import uuid
+        from ..models.dialogue import DialogueMessage, MessageRole
+
+        # 准备角色列表描述
+        characters_list_desc = "\n".join([
+            f"- {char.name}: {char.description}"
+            for char in session.story_state.characters
+        ])
+
+        # 生成群聊开场欢迎消息
+        welcome_message_id = f"msg_{uuid.uuid4().hex[:8]}"
+        welcome_content = f"""🎉 欢迎来到案发现场！
+
+**故事背景**：{session.story_state.background}
+
+**在场人员**：
+{characters_list_desc}
+
+现在大家已经聚集在这里，让我们开始调查吧！"""
+
+        welcome_message = DialogueMessage(
+            id=welcome_message_id,
+            role=MessageRole.SYSTEM,
+            sender_id="system",
+            sender_name="系统",
+            sender_avatar="📢",
+            content=welcome_content,
+            options=scene_intro.get("options", []),
+            mentioned_characters=[],
+            message_type="system"
+        )
+        session.dialogue_history.add_message(welcome_message)
+
+        # 添加主角色的开场消息
+        main_char = session.story_state.characters[0] if session.story_state.characters else None
+        if main_char:
+            main_message_id = f"msg_{uuid.uuid4().hex[:8]}"
+            main_message = DialogueMessage(
+                id=main_message_id,
+                role=MessageRole.ASSISTANT,
+                sender_id=main_char.id,
+                sender_name=main_char.name,
+                sender_avatar=main_char.avatar,
+                content=scene_intro["message"],
+                options=scene_intro.get("options", []),
+                mentioned_characters=[],
+                message_type="text"
+            )
+            session.dialogue_history.add_message(main_message)
+
         session_service.update_session(session)
 
         # 启动计时器

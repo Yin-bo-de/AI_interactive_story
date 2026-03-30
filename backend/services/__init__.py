@@ -4,6 +4,8 @@ from .llm_service import LLMService, get_llm_service
 from .session_service import SessionService, get_session_service
 from .story_service import StoryService, get_story_service
 from .timer_service import TimerService, get_timer_service
+from .character_service import CharacterService, get_character_service
+from .group_chat_service import GroupChatService, get_group_chat_service
 
 __all__ = [
     "LLMService",
@@ -14,4 +16,8 @@ __all__ = [
     "get_story_service",
     "TimerService",
     "get_timer_service",
+    "CharacterService",
+    "get_character_service",
+    "GroupChatService",
+    "get_group_chat_service",
 ]

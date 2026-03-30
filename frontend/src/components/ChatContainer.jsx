@@ -1,13 +1,13 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { useGame } from '../contexts/GameContext';
 import Typewriter from './Typewriter';
 
 /**
  * 聊天容器组件
- * 显示对话历史
+ * 显示对话历史，支持@提及高亮
  */
 const ChatContainer = () => {
-  const { messages, scrollToBottom } = useGame();
+  const { messages, scrollToBottom, speakingCharacters, isGroupChatMode, characters } = useGame();
   const chatEndRef = useRef(null);
   const messagesListRef = useRef(null);
 
@@ -22,6 +22,66 @@ const ChatContainer = () => {
     }
   }, [messages, scrollToBottom]);
 
+  // 渲染带@提及高亮的内容
+  const renderContentWithMentions = (content) => {
+    if (!content) return content;
+
+    // 构建角色名称正则表达式
+    const characterNames = characters
+      .filter(char => char.is_active !== false)
+      .map(char => char.name);
+
+    if (characterNames.length === 0) {
+      return content;
+    }
+
+    // 分割内容，识别@提及
+    const parts = [];
+    let lastIndex = 0;
+    const regex = new RegExp(`@(${characterNames.join('|')})`, 'g');
+    let match;
+
+    while ((match = regex.exec(content)) !== null) {
+      // 添加@前面的文本
+      if (match.index > lastIndex) {
+        parts.push({
+          type: 'text',
+          content: content.substring(lastIndex, match.index)
+        });
+      }
+      // 添加@提及
+      parts.push({
+        type: 'mention',
+        name: match[1],
+        content: match[0]
+      });
+      lastIndex = match.index + match[0].length;
+    }
+
+    // 添加剩余的文本
+    if (lastIndex < content.length) {
+      parts.push({
+        type: 'text',
+        content: content.substring(lastIndex)
+      });
+    }
+
+    if (parts.length === 0) {
+      return content;
+    }
+
+    return parts.map((part, index) => {
+      if (part.type === 'mention') {
+        return (
+          <span key={index} className="mention-highlight">
+            {part.content}
+          </span>
+        );
+      }
+      return part.content;
+    });
+  };
+
   return (
     <div className="chat-container">
       {messages.length === 0 ? (
@@ -31,35 +91,72 @@ const ChatContainer = () => {
         </div>
       ) : (
         <div className="messages-list" ref={messagesListRef}>
-          {messages.map((message, index) => (
-            <div
-              key={index}
-              className={`message ${message.role}`}
-            >
+          {messages.map((message, index) => {
+            // 兼容新旧消息格式
+            const isUser = message.role === 'user' || message.sender_id === 'user';
+            const isSystem = message.role === 'system' || message.message_type === 'system';
+            const senderName = message.sender_name || (isUser ? '你' : '侦探');
+            const senderAvatar = message.sender_avatar || (isSystem ? '📢' : (isUser ? '👤' : '🔍'));
+
+            return (
+              <div
+                key={message.id || index}
+                className={`message ${isUser ? 'user' : ''} ${isSystem ? 'system' : ''}`}
+              >
+                <div className="message-avatar">
+                  {senderAvatar}
+                </div>
+                <div className="message-content">
+                  {isGroupChatMode && !isUser && !isSystem && (
+                    <div className="message-sender-name">
+                      {senderName}
+                    </div>
+                  )}
+                  <div className="message-text">
+                    {message.role === 'assistant' && index === messages.length - 1 && !isSystem ? (
+                      <Typewriter
+                        text={message.content}
+                        speed={50}
+                        showCursor={false}
+                      />
+                    ) : (
+                      renderContentWithMentions(message.content)
+                    )}
+                  </div>
+                  {!isSystem && (
+                    <div className="message-time">
+                      {new Date(message.timestamp).toLocaleTimeString('zh-CN', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* 正在输入提示 */}
+          {speakingCharacters.length > 0 && (
+            <div className="message typing-indicator">
               <div className="message-avatar">
-                {message.role === 'user' ? '👤' : '🔍'}
+                💬
               </div>
               <div className="message-content">
                 <div className="message-text">
-                  {message.role === 'assistant' ? (
-                    <Typewriter
-                      text={message.content}
-                      speed={100}
-                      showCursor={false}
-                    />
-                  ) : (
-                    message.content
-                  )}
-                </div>
-                <div className="message-time">
-                  {new Date(message.timestamp).toLocaleTimeString('zh-CN', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
+                  <div className="typing-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                  <span className="typing-text">
+                    {speakingCharacters.join('、')} 正在输入...
+                  </span>
                 </div>
               </div>
             </div>
-          ))}
+          )}
+
           <div ref={chatEndRef} />
         </div>
       )}
@@ -125,6 +222,26 @@ const ChatContainer = () => {
           flex-direction: row-reverse;
         }
 
+        .message.system {
+          justify-content: center;
+        }
+
+        .message.system .message-avatar {
+          display: none;
+        }
+
+        .message.system .message-content {
+          max-width: 100%;
+        }
+
+        .message.system .message-text {
+          background: rgba(33, 150, 243, 0.1);
+          border: 1px solid rgba(33, 150, 243, 0.3);
+          text-align: center;
+          color: #64b5f6;
+          border-radius: 12px;
+        }
+
         .message-avatar {
           width: 40px;
           height: 40px;
@@ -162,6 +279,14 @@ const ChatContainer = () => {
           color: #ffffff;
         }
 
+        .mention-highlight {
+          color: #64b5f6;
+          font-weight: 600;
+          background: rgba(33, 150, 243, 0.15);
+          padding: 0 4px;
+          border-radius: 4px;
+        }
+
         .message-time {
           font-size: 11px;
           color: #52525b;
@@ -170,6 +295,58 @@ const ChatContainer = () => {
 
         .message.user .message-time {
           text-align: right;
+        }
+
+        .message-sender-name {
+          font-size: 12px;
+          font-weight: 600;
+          color: #2196F3;
+          margin-bottom: 4px;
+        }
+
+        .typing-indicator .message-text {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          background: transparent;
+          padding: 0;
+        }
+
+        .typing-dots {
+          display: flex;
+          gap: 4px;
+        }
+
+        .typing-dots span {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #2196F3;
+          animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dots span:nth-child(1) {
+          animation-delay: -0.32s;
+        }
+
+        .typing-dots span:nth-child(2) {
+          animation-delay: -0.16s;
+        }
+
+        @keyframes typing {
+          0%, 80%, 100% {
+            transform: scale(0.6);
+            opacity: 0.5;
+          }
+          40% {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+
+        .typing-text {
+          color: #a1a1aa;
+          font-size: 14px;
         }
       `}</style>
     </div>

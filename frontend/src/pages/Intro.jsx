@@ -51,10 +51,11 @@ const Intro = () => {
 
   // 切换音乐开关
   const toggleMusic = () => {
-    setMusicEnabled(!musicEnabled);
+    const newMusicEnabled = !musicEnabled;
+    setMusicEnabled(newMusicEnabled);
     const audio = document.querySelector('audio');
     if (audio) {
-      if (!musicEnabled) {
+      if (newMusicEnabled) {
         audio.play().catch(err => console.log('播放失败:', err));
       } else {
         audio.pause();

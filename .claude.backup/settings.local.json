@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "Bash(source:*)",
+      "Bash(cd:*)",
+      "Bash(npm install:*)",
+      "Read(//Users/Users/yinbo/AI_Project/**)",
+      "Bash(ls -la /Users/yinbo/AI_Project/AI_interactive_story/*.sh)",
+      "Bash(pip list:*)"
+    ]
+  }
+}

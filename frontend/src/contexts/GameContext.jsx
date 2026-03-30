@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { createSession, getSessionStatus, enterScene as enterSceneAPI, end as endGameAPI } from '../api/session';
-import { sendMessage as sendMessageAPI } from '../api/message';
+import { sendMessage as sendMessageAPI, sendGroupMessage, getNextSpeech, getCharacters, getMessages } from '../api/message';
 
 const GameContext = createContext(null);
 
@@ -26,6 +26,11 @@ export const GameProvider = ({ children }) => {
   const [isSending, setIsSending] = useState(false);
   const [scrollToBottom, setScrollToBottom] = useState(false);
   const [currentOptions, setCurrentOptions] = useState([]);
+
+  // 群聊相关状态
+  const [isGroupChatMode, setIsGroupChatMode] = useState(true); // 默认启用群聊模式
+  const [speakingCharacters, setSpeakingCharacters] = useState([]); // 正在输入的角色列表
+  const [speechPollingInterval, setSpeechPollingInterval] = useState(null);
 
   // 结局状态
   const [isEnded, setIsEnded] = useState(false);
@@ -94,15 +99,33 @@ export const GameProvider = ({ children }) => {
       const response = await enterSceneAPI(sessionId);
       console.log('[GameContext] 收到现场介绍:', response);
 
-      // 添加初始AI消息
-      const initialMessage = {
-        role: 'assistant',
-        content: response.initial_message,
-        timestamp: new Date().toISOString(),
-        options: response.options
-      };
-      setMessages([initialMessage]);
-      setCurrentOptions(response.options);
+      if (isGroupChatMode) {
+        // 群聊模式：获取完整的消息历史
+        console.log('[GameContext] 群聊模式：获取消息历史...');
+        const historyResponse = await getMessages(sessionId);
+        console.log('[GameContext] 消息历史:', historyResponse);
+        setMessages(historyResponse.messages);
+        setCurrentOptions(response.options || []);
+
+        // 刷新角色列表
+        try {
+          const chars = await getCharacters(sessionId);
+          console.log('[GameContext] 角色列表:', chars);
+          setCharacters(chars);
+        } catch (err) {
+          console.error('[GameContext] 获取角色列表失败:', err);
+        }
+      } else {
+        // 单聊模式：添加初始AI消息
+        const initialMessage = {
+          role: 'assistant',
+          content: response.initial_message,
+          timestamp: new Date().toISOString(),
+          options: response.options
+        };
+        setMessages([initialMessage]);
+        setCurrentOptions(response.options);
+      }
 
       console.log('[GameContext] 设置游戏状态为 active');
       setGameStatus('active');
@@ -121,7 +144,7 @@ export const GameProvider = ({ children }) => {
   };
 
   /**
-   * 发送用户消息（非流式）
+   * 发送用户消息（非流式，单聊模式）
    */
   const sendMessage = async (content) => {
     if (!sessionId || isSending || isEnded) return;
@@ -133,6 +156,8 @@ export const GameProvider = ({ children }) => {
       // 添加用户消息到历史
       const userMessage = {
         role: 'user',
+        sender_id: 'user',
+        sender_name: '你',
         content,
         timestamp: new Date().toISOString()
       };
@@ -145,6 +170,8 @@ export const GameProvider = ({ children }) => {
       // 添加AI回复到历史
       const aiMessage = {
         role: 'assistant',
+        sender_id: 'assistant',
+        sender_name: '侦探',
         content: response.ai_message,
         timestamp: new Date().toISOString(),
         options: response.options
@@ -176,6 +203,131 @@ export const GameProvider = ({ children }) => {
   };
 
   /**
+   * 发送用户消息（群聊模式）
+   */
+  const sendGroupChatMessage = async (content) => {
+    if (!sessionId || isSending || isEnded) return;
+
+    try {
+      setIsSending(true);
+      setError(null);
+
+      // 添加用户消息到历史
+      const messageId = `msg_${Date.now()}`;
+      const userMessage = {
+        id: messageId,
+        role: 'user',
+        sender_id: 'user',
+        sender_name: '你',
+        sender_avatar: null,
+        content,
+        timestamp: new Date().toISOString(),
+        options: null,
+        mentioned_characters: [],
+        message_type: 'text'
+      };
+      setMessages(prev => [...prev, userMessage]);
+      setScrollToBottom(true);
+
+      // 调用群聊发送接口
+      console.log('[GameContext] 调用 sendGroupMessage API...');
+      const response = await sendGroupMessage(sessionId, content);
+      console.log('[GameContext] sendGroupMessage 响应:', response);
+
+      // 刷新角色列表
+      try {
+        const chars = await getCharacters(sessionId);
+        setCharacters(chars);
+      } catch (err) {
+        console.error('[GameContext] 刷新角色列表失败:', err);
+      }
+
+      // 更新轮次
+      setCurrentRound(response.round_number);
+
+      // 更新剩余时间
+      setRemainingTime(response.remaining_time);
+
+      // 检查游戏是否结束
+      if (response.game_over) {
+        handleGameEnd(response.ending);
+        return;
+      }
+
+      // 开始轮询获取AI发言
+      console.log('[GameContext] 开始轮询获取AI发言');
+      startSpeechPolling();
+
+    } catch (err) {
+      console.error('发送群聊消息失败:', err);
+      setError(err.response?.data?.detail || '发送消息失败');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  /**
+   * 开始轮询获取AI发言
+   */
+  const startSpeechPolling = () => {
+    if (speechPollingInterval) return;
+    console.log('[GameContext] 启动轮询定时器');
+
+    const interval = setInterval(async () => {
+      if (!sessionId || isEnded) return;
+
+      try {
+        console.log('[GameContext] 调用 getNextSpeech...');
+        const response = await getNextSpeech(sessionId);
+        console.log('[GameContext] getNextSpeech 响应:', response);
+
+        if (response.has_next && response.message) {
+          console.log('[GameContext] 添加AI消息到历史:', response.message);
+          // 添加AI消息到历史
+          setMessages(prev => [...prev, response.message]);
+          setScrollToBottom(true);
+
+          // 更新选项（如果有）
+          if (response.message.options && response.message.options.length > 0) {
+            setCurrentOptions(response.message.options);
+          }
+
+          // 如果有下一个发言者，显示正在输入
+          if (response.next_speaker) {
+            setSpeakingCharacters(prev => [...new Set([...prev, response.next_speaker])]);
+          } else {
+            setSpeakingCharacters([]);
+          }
+        } else {
+          console.log('[GameContext] 没有更多发言了，停止轮询');
+          // 没有更多发言了，停止轮询
+          stopSpeechPolling();
+          setSpeakingCharacters([]);
+        }
+      } catch (err) {
+        console.error('[GameContext] 获取下一个发言失败:', err);
+        // 出错时重试几次后停止
+        stopSpeechPolling();
+        setSpeakingCharacters([]);
+      }
+    }, 1000); // 每秒轮询一次
+
+    setSpeechPollingInterval(interval);
+  };
+
+  /**
+   * 停止轮询AI发言
+   */
+  const stopSpeechPolling = () => {
+    if (speechPollingInterval) {
+      console.log('[GameContext] 停止轮询定时器');
+      clearInterval(speechPollingInterval);
+      setSpeechPollingInterval(null);
+    }
+    setSpeakingCharacters([]);
+  };
+
+  /**
    * 处理游戏结束
    */
   const handleGameEnd = (endingData) => {
@@ -190,7 +342,11 @@ export const GameProvider = ({ children }) => {
    * 处理选项点击
    */
   const handleOptionClick = async (option) => {
-    await sendMessage(option);
+    if (isGroupChatMode) {
+      await sendGroupChatMessage(option);
+    } else {
+      await sendMessage(option);
+    }
   };
 
   /**
@@ -292,6 +448,10 @@ export const GameProvider = ({ children }) => {
     scrollToBottom,
     currentOptions,
 
+    // 群聊
+    isGroupChatMode,
+    speakingCharacters,
+
     // 结局
     isEnded,
     ending,
@@ -310,9 +470,12 @@ export const GameProvider = ({ children }) => {
     initializeGame,
     enterScene,
     sendMessage,
+    sendGroupChatMessage,
     handleOptionClick,
     restartGame,
-    handleGameEnd
+    handleGameEnd,
+    startSpeechPolling,
+    stopSpeechPolling
   };
 
   return (

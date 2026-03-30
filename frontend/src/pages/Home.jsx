@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGame } from '../contexts/GameContext';
 import { apiClient } from '../api/client';
 
@@ -27,7 +27,7 @@ const Home = () => {
   const [codeErrorMessage, setCodeErrorMessage] = useState('');
 
   // 检查本地存储中的验证状态
-  useState(() => {
+  useEffect(() => {
     const savedVerified = localStorage.getItem('api_verified') === 'true';
     const savedApiKey = localStorage.getItem('api_key') || '';
     const savedApiBase = localStorage.getItem('api_base') || '';
@@ -39,7 +39,7 @@ const Home = () => {
       setApiBase(savedApiBase);
       setModelName(savedModelName);
     }
-  });
+  }, []);
 
   const storyTypes = [
     {
@@ -576,7 +576,8 @@ const Home = () => {
         }
 
         .config-input:disabled {
-          opacity: 0kt-allowed;
+          opacity: 0.5;
+          cursor: not-allowed;
         }
 
         .verify-btn {

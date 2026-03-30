@@ -51,3 +51,6 @@ tmp/
 temp/
 *.tmp
 *.temp
+
+# Claude Orchestra state
+.claude/state/

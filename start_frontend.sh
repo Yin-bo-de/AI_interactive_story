@@ -9,6 +9,7 @@ echo "=========================================="
 
 # 配置
 PORT=${PORT:-5173}
+HOST=${HOST:-0.0.0.0}
 
 # 查找占用端口的进程
 echo "检查端口 ${PORT} 是否被占用..."
@@ -61,4 +62,4 @@ echo ""
 
 # 启动服务
 cd frontend
-npm run dev
+npm run dev -- --host ${HOST} --port ${PORT}

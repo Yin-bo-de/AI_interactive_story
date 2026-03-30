@@ -13,6 +13,11 @@ from .end_prompt import (
     get_end_prompt,
     get_ending_selection_prompt
 )
+from .group_chat_prompts import (
+    get_group_chat_scheduler_prompt,
+    get_character_speech_prompt,
+    get_group_chat_opening_prompt
+)
 
 __all__ = [
     "get_init_prompt",
@@ -22,4 +27,7 @@ __all__ = [
     "get_summary_prompt",
     "get_end_prompt",
     "get_ending_selection_prompt",
+    "get_group_chat_scheduler_prompt",
+    "get_character_speech_prompt",
+    "get_group_chat_opening_prompt",
 ]
